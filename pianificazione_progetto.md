@@ -10,21 +10,21 @@
 
 ## Setup iniziale (giorno 0–1)
 
-- [ ] Creare repo Git condiviso (codice in `.py`, notebook come orchestratore)
-- [ ] Impostare struttura cartelle (`data/`, `features/`, `src/`, `notebook/`, `results/`)
+- [x] Creare repo Git condiviso (codice in `.py`, notebook come orchestratore)
+- [x] Impostare struttura cartelle (`data/`, `features/`, `src/`, `notebook/`, `results/`)
 - [ ] Configurare `nbstripout` o Jupytext per diff puliti del notebook
-- [ ] Registrare il gruppo tramite il Google Form
-- [ ] Verificare accesso a Colab + GPU e al JSON delle query / link Moodle
+- [x] Registrare il gruppo tramite il Google Form
+- [x] Verificare accesso a Colab + GPU e al JSON delle query / link Moodle
 
 ---
 
 ## Fase 1 — Fondamenta condivise (giorni 1–4) · in coppia
 
-- [ ] Lettura approfondita dei tre documenti (assignment, GDE/Berasi, CLAY)
-- [ ] Allineamento sul significato del modulo Φ e su come positivi/negativi devono interagire
-- [ ] Caricamento corretto di CelebA con la classe PyTorch (usare `celeba[idx]`, **non** i nomi file)
-- [ ] Esplorazione delle 40 annotazioni di attributi
-- [ ] Mapping fra le 8 query del JSON e gli attributi del dataset
+- [x] Lettura approfondita dei tre documenti (assignment, GDE/Berasi, CLAY)
+- [x] Allineamento sul significato del modulo Φ e su come positivi/negativi devono interagire
+- [x] Caricamento corretto di CelebA con la classe PyTorch (usare `celeba[idx]`, **non** i nomi file)
+- [x] Esplorazione delle 40 annotazioni di attributi
+- [x] Mapping fra le 8 query del JSON e gli attributi del dataset
 - [ ] Script di validazione: verificare che esistano immagini target valide per ogni query nel corpus
 
 ---
