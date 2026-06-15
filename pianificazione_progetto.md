@@ -32,9 +32,9 @@
 ## Fase 2 — Feature offline + pipeline di valutazione (giorni 5–8) · A e B in parallelo
 
 **Persona A — Estrazione feature**
-- [ ] Caricare CLIP ViT-B/32 da HuggingFace
-- [ ] Estrarre le feature visive di tutto il corpus
-- [ ] Salvare il database visivo "congelato" (riuso in tutti gli esperimenti)
+- [x] Caricare CLIP ViT-B/32 da HuggingFace
+- [x] Estrarre le feature visive di tutto il corpus
+- [x] Salvare il database visivo "congelato" (riuso in tutti gli esperimenti)
 - [ ] Funzione di encoding testuale per le condizioni
 
 **Persona B — Pipeline di metriche**
