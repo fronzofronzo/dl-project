@@ -25,7 +25,7 @@
 - [x] Caricamento corretto di CelebA con la classe PyTorch (usare `celeba[idx]`, **non** i nomi file)
 - [x] Esplorazione delle 40 annotazioni di attributi
 - [x] Mapping fra le 8 query del JSON e gli attributi del dataset
-- [ ] Script di validazione: verificare che esistano immagini target valide per ogni query nel corpus
+- [x] Script di validazione: verificare che esistano immagini target valide per ogni query nel corpus
 
 ---
 
