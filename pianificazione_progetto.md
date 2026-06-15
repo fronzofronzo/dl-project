@@ -35,13 +35,12 @@
 - [x] Caricare CLIP ViT-B/32 da HuggingFace
 - [x] Estrarre le feature visive di tutto il corpus
 - [x] Salvare il database visivo "congelato" (riuso in tutti gli esperimenti)
-- [ ] Funzione di encoding testuale per le condizioni
 
 **Persona B — Pipeline di metriche**
-- [ ] Costruzione del ground-truth a partire dal JSON
-- [ ] Implementare Recall@K (K = 1, 5, 10)
-- [ ] Implementare Precision@K (K = 1, 5, 10)
-- [ ] Media sulle source image valide + test della pipeline su dati fittizi
+- [x] Costruzione del ground-truth a partire dal JSON
+- [x] Implementare Recall@K (K = 1, 5, 10)
+- [x] Implementare Precision@K (K = 1, 5, 10)
+- [x] Media sulle source image valide + test della pipeline su dati fittizi
 
 ---
 
