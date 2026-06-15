@@ -58,20 +58,21 @@ def verify_eval_indices(dataset, eval_json):
         'ok': ok,
     }
 
-data_dir = Path('data')
-celeba = load_data(data_dir, split='train', download=False)
-print(f"Number of samples in the dataset: {len(celeba)}")
+if __name__ == "__main__":
+    data_dir = Path('data')
+    celeba = load_data(data_dir, split='train', download=False)
+    print(f"Number of samples in the dataset: {len(celeba)}")
 
-img, attrs = celeba[0]
-# img.show()
+    img, attrs = celeba[0]
+    # img.show()
 
-attr_dict = wire_attributes(celeba)
-print(f"Attribute names: {list(attr_dict.keys())}")
-print(f"Attribute for the first sample: {attrs}")
+    attr_dict = wire_attributes(celeba)
+    print(f"Attribute names: {list(attr_dict.keys())}")
+    print(f"Attribute for the first sample: {attrs}")
 
-pos, neg = parse_query("+Eyeglasses, +Smiling", attr_dict)
-print(f"pos={pos} neg={neg}")
+    pos, neg = parse_query("+Eyeglasses, +Smiling", attr_dict)
+    print(f"pos={pos} neg={neg}")
 
-celeba_test = load_data(data_dir, split='test', download=False)
-report = verify_eval_indices(celeba_test, 'data/celeba_evaluation.json')
-print(f"Verifica indici eval (split=test): {report}")
+    celeba_test = load_data(data_dir, split='test', download=False)
+    report = verify_eval_indices(celeba_test, 'data/celeba_evaluation.json')
+    print(f"Verifica indici eval (split=test): {report}")
