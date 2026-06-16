@@ -46,10 +46,10 @@
 
 ## Fase 3 — Baseline zero-shot (giorni 8–10)
 
-- [ ] Implementare l'aritmetica latente naïve (v_target ≈ v_ref + t_pos − t_neg)
-- [ ] Eseguire la baseline su tutte le query (semplici + composta)
-- [ ] Congelare i numeri di riferimento (lower bound)
-- [ ] Sanity check della pipeline di valutazione sui risultati baseline
+- [x] Implementare l'aritmetica latente naïve (v_target ≈ v_ref + t_pos − t_neg)
+- [x] Eseguire la baseline su tutte le query (semplici + composta)
+- [x] Congelare i numeri di riferimento (lower bound)
+- [x] Sanity check della pipeline di valutazione sui risultati baseline
 
 ---
 
