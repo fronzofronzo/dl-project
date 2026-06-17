@@ -95,7 +95,7 @@ def main():
     render(celeba, ref_idx, no_edit, edited, pos_idx, neg_idx, query, alpha)
 
 
-def render(celeba, ref_idx, no_edit, edited, pos_idx, neg_idx, query, alpha):
+def render(celeba, ref_idx, no_edit, edited, pos_idx, neg_idx, query, alpha, out_name=None):
     try:
         font = ImageFont.truetype("Arial.ttf", 13)
     except Exception:
@@ -125,8 +125,9 @@ def render(celeba, ref_idx, no_edit, edited, pos_idx, neg_idx, query, alpha):
                          (x, y0 + LABEL_H))
 
     RESULTS.mkdir(exist_ok=True)
-    safe = re.sub(r"[^A-Za-z0-9]+", "_", query).strip("_")
-    out = RESULTS / f"demo_{safe}.png"
+    if out_name is None:
+        out_name = "demo_" + re.sub(r"[^A-Za-z0-9]+", "_", query).strip("_") + ".png"
+    out = RESULTS / out_name
     canvas.save(out)
     print(f"salvato -> {out}")
 
