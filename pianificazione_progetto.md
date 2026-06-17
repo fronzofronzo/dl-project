@@ -55,7 +55,7 @@
 
 ## Fase 4 — Sviluppo del metodo (giorni 10–16) · cuore del progetto, sync frequenti
 
-- [ ] Scegliere l'approccio per Φ (cross-attention / gating / proiezione non-lineare / variante dinamica di SVD)
+- [x] Scegliere l'approccio per Φ (cross-attention / gating / proiezione non-lineare / variante dinamica di SVD)
 - [ ] Definire formalmente la combinazione positivi/negativi (pesi dinamici condizionati dal testo)
 - [ ] Implementare il modulo di fusione
 - [ ] (Se training-based) Implementare il training loop
