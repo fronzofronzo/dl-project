@@ -1,23 +1,19 @@
-"""Soluzione A ingrediente 1C: valutazione full con pesi dinamici condizionati dall'input.
+"""Solution A ingredient 1: contrastive direction axes in ambient space.
 
-Per ogni source v_ref, i pesi per attributo sono calcolati da cos(v_ref, d_i):
-  w_i^+ = max(0, 1 - cos(v_ref, d_i))   push dove l'attributo MANCA
-  w_j^- = max(0, cos(v_ref, d_j))        push dove l'attributo da negare E' presente
+Per attribute builds an oriented axis d = z_with - z_without, then
+v_target = v_ref + alpha*(Σ d_pos − Σ d_neg). Alpha sweep, freezes the best and
+compares directly against the naive baseline.
 
-Confronto vs contrastive (pesi fissi) se contrastive_ambient.json esiste.
-
-Run da repo root:  .venv/bin/python src/run_dynamic_weights.py
+Run from repo root:  python -m src.solution_a.run_contrastive
 """
 import json
-from pathlib import Path
 
-from baselines import build_direction_axes
-from dynamic_weights import dynamic_query
-from groundtruth import build_ground_truth
-from metrics import evaluate_all
-from retrieval import load_db, rank
+from src.common.paths import PROJECT_ROOT as ROOT
+from src.solution_a.directions import build_direction_axes, contrastive_query
+from src.common.groundtruth import build_ground_truth
+from src.common.metrics import evaluate_all
+from src.common.retrieval import load_db, rank
 
-ROOT = Path(__file__).resolve().parent.parent
 EVAL_JSON = ROOT / "data" / "celeba_evaluation.json"
 RESULTS = ROOT / "results"
 KS = (1, 5, 10)
@@ -29,7 +25,7 @@ def eval_alpha(gts, axes, db, alpha):
     for qgt in gts:
         rpq = rankings_per_query.setdefault(qgt.query, {})
         for s in qgt.gt:
-            v_t = dynamic_query(db[s], qgt.pos, qgt.neg, axes, alpha=alpha)
+            v_t = contrastive_query(db[s], qgt.pos, qgt.neg, axes, alpha=alpha)
             rpq[s] = rank(v_t, db, exclude={s}, k=max(KS))
         assert len(rpq) == len(qgt.gt), f"{qgt.query!r}: source count mismatch"
     return evaluate_all(rankings_per_query, gts, ks=KS), rankings_per_query
@@ -39,11 +35,11 @@ def main():
     gts = build_ground_truth(EVAL_JSON)
     names = {n for q in gts for n in (*q.pos, *q.neg)}
     axes = build_direction_axes(names)
-    db = load_db(ROOT / "data" / "clip_features_test.pt")
+    db = load_db()
     print(f"DB {tuple(db.shape)} | {len(gts)} queries | {len(names)} attrs | alphas {ALPHAS}")
 
-    sweep = {}
-    best = None
+    sweep = {}                          # alpha -> MACRO row
+    best = None                         # (alpha, rows)
     for a in ALPHAS:
         rows, _ = eval_alpha(gts, axes, db, a)
         macro = rows["MACRO"]
@@ -55,6 +51,7 @@ def main():
     best_alpha, best_rows = best[0], best[1]
     print(f"best alpha = {best_alpha} (by R@1, tie R@5)")
 
+    # range sanity
     for k in KS:
         for q, r in best_rows.items():
             assert 0.0 <= r[f"recall@{k}"] <= 1.0 and 0.0 <= r[f"precision@{k}"] <= 1.0, q
@@ -65,44 +62,45 @@ def main():
 
 def write_results(rows, best_alpha, sweep):
     RESULTS.mkdir(exist_ok=True)
-    (RESULTS / "dynamic_weights.json").write_text(
+    (RESULTS / "contrastive_ambient.json").write_text(
         json.dumps({"best_alpha": best_alpha, "rows": rows}, indent=2))
 
     cols = [f"{m}@{k}" for k in KS for m in ("recall", "precision")]
     ordered = [q for q in rows if q != "MACRO"] + (["MACRO"] if "MACRO" in rows else [])
 
-    lines = [f"# Dynamic weights — ambient (best alpha = {best_alpha})", "",
+    # tabella principale (best alpha)
+    lines = [f"# Contrastive direction axes — ambient (best alpha = {best_alpha})", "",
              "| query | " + " | ".join(cols) + " | n_sources |",
              "|" + "---|" * (len(cols) + 2)]
     for q in ordered:
         r = rows[q]
         lines.append(f"| {q} | " + " | ".join(f"{r[c]:.3f}" for c in cols) + f" | {r['n_sources']} |")
 
-    # confronto vs contrastive se disponibile
-    contr_path = RESULTS / "contrastive_ambient.json"
-    if contr_path.exists():
-        contr = json.loads(contr_path.read_text())["rows"]
-        lines += ["", "## Contrastive vs Dynamic weights (per query, R@1 / R@5)", "",
-                  "| query | contr R@1 | dyn R@1 | contr R@5 | dyn R@5 |",
+    # confronto MACRO naive vs contrastive (se la baseline esiste)
+    naive_path = RESULTS / "baseline_naive.json"
+    if naive_path.exists():
+        naive = json.loads(naive_path.read_text())
+        lines += ["", "## Naive vs Contrastive (per query, R@1 / R@5)", "",
+                  "| query | naive R@1 | contr R@1 | naive R@5 | contr R@5 |",
                   "|---|---|---|---|---|"]
         for q in ordered:
-            if q in contr:
-                c, d = contr[q], rows[q]
-                lines.append(f"| {q} | {c['recall@1']:.3f} | {d['recall@1']:.3f} "
-                             f"| {c['recall@5']:.3f} | {d['recall@5']:.3f} |")
-    (RESULTS / "dynamic_weights.md").write_text("\n".join(lines) + "\n")
+            if q in naive:
+                n, c = naive[q], rows[q]
+                lines.append(f"| {q} | {n['recall@1']:.3f} | {c['recall@1']:.3f} "
+                             f"| {n['recall@5']:.3f} | {c['recall@5']:.3f} |")
+    (RESULTS / "contrastive_ambient.md").write_text("\n".join(lines) + "\n")
 
     # alpha sweep
-    sl = ["# Dynamic weights — alpha sweep (MACRO)", "",
+    sl = ["# Contrastive — alpha sweep (MACRO)", "",
           "| alpha | R@1 | R@5 | R@10 | P@1 | P@5 | P@10 |", "|---|---|---|---|---|---|---|"]
     for a in sorted(sweep):
         m = sweep[a]
         mark = " (best)" if a == best_alpha else ""
         sl.append(f"| {a}{mark} | {m['recall@1']:.3f} | {m['recall@5']:.3f} | {m['recall@10']:.3f} "
                   f"| {m['precision@1']:.3f} | {m['precision@5']:.3f} | {m['precision@10']:.3f} |")
-    (RESULTS / "dynamic_weights_alpha_sweep.md").write_text("\n".join(sl) + "\n")
+    (RESULTS / "contrastive_alpha_sweep.md").write_text("\n".join(sl) + "\n")
 
-    print(f"frozen -> {RESULTS / 'dynamic_weights.md'} , dynamic_weights_alpha_sweep.md")
+    print(f"frozen -> {RESULTS / 'contrastive_ambient.md'} , contrastive_alpha_sweep.md")
 
 
 if __name__ == "__main__":

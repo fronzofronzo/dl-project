@@ -4,19 +4,16 @@ Builds per-source rankings against the frozen visual DB, evaluates Recall@K /
 Precision@K, runs sanity checks, and freezes the numbers (lower bound) to
 results/baseline_naive.{json,md}.
 
-Run from repo root:  .venv/bin/python src/run_baseline.py
+Run from repo root:  python -m src.baselines.run
 """
 import json
-from pathlib import Path
 
-import torch
+from src.common.paths import PROJECT_ROOT as ROOT
+from src.baselines.naive import naive_query, precompute_text
+from src.common.groundtruth import build_ground_truth
+from src.common.metrics import evaluate_all
+from src.common.retrieval import load_db, rank
 
-from baselines import naive_query, precompute_text
-from groundtruth import build_ground_truth
-from metrics import evaluate_all
-from retrieval import load_db, rank
-
-ROOT = Path(__file__).resolve().parent.parent
 EVAL_JSON = ROOT / "data" / "celeba_evaluation.json"
 RESULTS = ROOT / "results"
 KS = (1, 5, 10)
@@ -44,7 +41,7 @@ def main():
     gts = build_ground_truth(EVAL_JSON)            # names mode (pos/neg are strings)
     names = {n for q in gts for n in (*q.pos, *q.neg)}
     text_cache = precompute_text(names)
-    db = load_db(ROOT / "data" / "clip_features_test.pt")
+    db = load_db()
     print(f"DB {tuple(db.shape)} | {len(gts)} queries | {len(names)} unique attrs")
 
     rankings_per_query = {}

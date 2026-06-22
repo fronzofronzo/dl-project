@@ -2,18 +2,18 @@
 import torch
 from pathlib import Path
 from torchvision.datasets import CelebA
-from baselines import build_direction_axes, contrastive_query
-from groundtruth import build_ground_truth
-from metrics import evaluate_all
-from rerank import build_image_probes, negative_rerank
-from retrieval import load_db
+from src.solution_a.directions import build_direction_axes, contrastive_query
+from src.common.groundtruth import build_ground_truth
+from src.common.metrics import evaluate_all
+from src.solution_a.rerank import build_image_probes, negative_rerank
+from src.common.retrieval import load_db
 
-ROOT = Path(__file__).resolve().parent.parent
+from src.common.paths import PROJECT_ROOT as ROOT
 gts = build_ground_truth(ROOT/"data"/"celeba_evaluation.json")
 names = sorted({n for q in gts for n in (*q.pos,*q.neg)})
 axes = build_direction_axes(names)
 db = load_db(ROOT/"data"/"clip_features_test.pt").float()
-ds = CelebA(root="data", split="test", download=False)
+ds = CelebA(root=str(ROOT / "data"), split="test", download=False)
 ai = {n:i for i,n in enumerate(ds.attr_names) if n}
 probes = build_image_probes(db, ds.attr.float(), ai, names)
 

@@ -9,7 +9,7 @@ Pipeline (query-side only, DB frozen):
 
 Sweeps (alpha, lambda). lambda=0 == no re-rank (ablation baseline).
 
-Run da repo root:  .venv/bin/python src/run_solution_a.py
+Run da repo root:  python -m src.solution_a.run
 """
 import json
 from pathlib import Path
@@ -17,13 +17,13 @@ from pathlib import Path
 import torch
 from torchvision.datasets import CelebA
 
-from baselines import build_direction_axes, contrastive_query
-from groundtruth import build_ground_truth
-from metrics import evaluate_all
-from rerank import build_image_probes, negative_rerank
-from retrieval import load_db
+from src.solution_a.directions import build_direction_axes, contrastive_query
+from src.common.groundtruth import build_ground_truth
+from src.common.metrics import evaluate_all
+from src.solution_a.rerank import build_image_probes, negative_rerank
+from src.common.retrieval import load_db
 
-ROOT = Path(__file__).resolve().parent.parent
+from src.common.paths import PROJECT_ROOT as ROOT
 EVAL_JSON = ROOT / "data" / "celeba_evaluation.json"
 RESULTS = ROOT / "results"
 KS = (1, 5, 10)
@@ -51,7 +51,7 @@ def main():
     db = load_db(ROOT / "data" / "clip_features_test.pt").float()
 
     # image-space presence probes for negated attributes (test labels -> see rerank.py caveat)
-    ds = CelebA(root="data", split="test", download=False)
+    ds = CelebA(root=str(ROOT / "data"), split="test", download=False)
     attr_index = {n: i for i, n in enumerate(ds.attr_names) if n}
     probes = build_image_probes(db, ds.attr.float(), attr_index, names)
 

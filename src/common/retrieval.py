@@ -1,6 +1,8 @@
 import torch
 
-DEFAULT_DB = "data/clip_features_test.pt"
+from src.common.paths import DB_TEST
+
+DEFAULT_DB = DB_TEST
 
 
 def load_db(path=DEFAULT_DB):

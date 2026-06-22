@@ -1,7 +1,6 @@
-from pathlib import Path
-
-from metrics import recall_at_k, precision_at_k, evaluate_query, evaluate_all
-from groundtruth import build_ground_truth, valid_sources, QueryGT
+from src.common.paths import EVAL_JSON
+from src.common.metrics import recall_at_k, precision_at_k, evaluate_query, evaluate_all
+from src.common.groundtruth import build_ground_truth, valid_sources, QueryGT
 
 EPS = 1e-9
 
@@ -83,8 +82,7 @@ def test_evaluate_all_macro():
 
 # ---------------------------------------------------------------- real JSON
 def test_real_json_parse():
-    json_path = Path(__file__).resolve().parent.parent / "data" / "celeba_evaluation.json"
-    gts = build_ground_truth(json_path)             # no attr_dict -> pos/neg are names
+    gts = build_ground_truth(EVAL_JSON)             # no attr_dict -> pos/neg are names
     assert len(gts) == 14, f"expected 14 entries, got {len(gts)}"
 
     by_query = {}

@@ -8,13 +8,13 @@ Checks the three things that silently kill results:
 import torch
 import torch.nn.functional as F
 
-from baselines import build_direction_axes
-from geometry import log_map, sphere_mean
-from groundtruth import build_ground_truth
-from retrieval import load_db
+from src.solution_a.directions import build_direction_axes
+from src.common.geometry import log_map, sphere_mean
+from src.common.groundtruth import build_ground_truth
+from src.common.retrieval import load_db
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+from src.common.paths import PROJECT_ROOT as ROOT
 db = load_db(ROOT / "data" / "clip_features_test.pt")
 db = F.normalize(db.float(), dim=-1)
 mu = sphere_mean(db)
@@ -55,8 +55,8 @@ for n in names:
     print(f"{n:<16} w_pos≈{w_pos:.3f}  w_neg≈{w_neg:.3f}")
 
 # 5. ceiling check: what does NO edit (pure v_ref) retrieve vs edited?
-from metrics import evaluate_all
-from retrieval import rank
+from src.common.metrics import evaluate_all
+from src.common.retrieval import rank
 
 def eval_fn(query_fn, label):
     rpq = {}
@@ -80,7 +80,7 @@ for n in names:
     c = db @ dn_cache[n]
     stats[n] = (c.mean().item(), c.std().item() + 1e-8)
 
-from geometry import exp_map
+from src.common.geometry import exp_map
 
 def tangent(v_ref, pos, neg, alpha, weight):
     z = log_map(mu, v_ref)
@@ -124,14 +124,14 @@ for a in (1.0,2.0,3.0,4.0):
 
 # 8. reference: ambient contrastive (the current champion)
 print("\n[8] ambient contrastive reference:")
-from baselines import contrastive_query
+from src.solution_a.directions import contrastive_query
 for a in (2.0,3.0,4.0):
     eval_fn(lambda v,p,n,a=a: contrastive_query(v,p,n,axes,alpha=a), f"ambient contrastive a={a}")
 
 # 9. image-space presence probe for dynamic weights (validation of headline feature)
 print("\n[9] image-space dynamic weights:")
 from torchvision.datasets import CelebA
-ds = CelebA(root="data", split="test", download=False)
+ds = CelebA(root=str(ROOT / "data"), split="test", download=False)
 A = ds.attr.float()              # [N,40] in {0,1}
 an = {nm:i for i,nm in enumerate(ds.attr_names) if nm}
 # image-space direction per attr: mean(img with) - mean(img without)

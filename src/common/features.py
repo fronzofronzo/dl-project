@@ -1,7 +1,8 @@
 import torch
 from torch.utils.data import DataLoader
 from transformers import CLIPProcessor, CLIPModel
-from load_data import load_data
+from src.common.data import load_data
+from src.common.paths import DATA, DB_TEST
 
 device = torch.device(
     'cuda' if torch.cuda.is_available()
@@ -35,7 +36,7 @@ def encode_data(images=None, texts=None):
 @torch.no_grad()
 def extract_corpus(split='test', batch_size=256, out_path=None):
     """Estrae le feature visive di tutto il corpus. Riga r == celeba[r]."""
-    dataset = load_data('data', split, download=False)
+    dataset = load_data(str(DATA), split, download=False)
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False,
                         num_workers=0, collate_fn=lambda b: [x[0] for x in b])
 
@@ -53,4 +54,4 @@ def extract_corpus(split='test', batch_size=256, out_path=None):
 
 
 if __name__ == "__main__":
-    extract_corpus(split='test', out_path='data/clip_features_test.pt')
+    extract_corpus(split='test', out_path=str(DB_TEST))

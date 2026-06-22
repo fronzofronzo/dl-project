@@ -5,8 +5,8 @@ Mostriamo tre righe: SORGENTE / top-K senza modifica / top-K con il prompt.
 Sotto ogni immagine recuperata: ✓ se soddisfa il prompt, ✗ altrimenti.
 
 Uso:
-  .venv/bin/python src/demo_single.py "+Eyeglasses"
-  .venv/bin/python src/demo_single.py "+Smiling" 13 4.0
+  .venv/bin/python -m src.solution_a.demo "+Eyeglasses"
+  .venv/bin/python -m src.solution_a.demo "+Smiling" 13 4.0
   (args: query [ref_idx] [alpha])
 """
 import sys
@@ -15,12 +15,12 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-from baselines import build_direction_axes, contrastive_query
-from groundtruth import build_ground_truth
-from load_data import load_data, wire_attributes
-from retrieval import load_db, rank
+from src.solution_a.directions import build_direction_axes, contrastive_query
+from src.common.groundtruth import build_ground_truth
+from src.common.data import load_data, wire_attributes
+from src.common.retrieval import load_db, rank
 
-ROOT = Path(__file__).resolve().parent.parent
+from src.common.paths import PROJECT_ROOT as ROOT
 RESULTS = ROOT / "results"
 K = 5
 CELL_W, CELL_H = 128, 156

@@ -3,13 +3,13 @@ from pathlib import Path
 
 import torch
 
-from baselines import build_direction_axes, contrastive_query
-from demo_single import K, parse_query, satisfies, render
-from groundtruth import build_ground_truth
-from load_data import load_data, wire_attributes
-from retrieval import load_db, rank
+from src.solution_a.directions import build_direction_axes, contrastive_query
+from src.solution_a.demo import K, parse_query, satisfies, render
+from src.common.groundtruth import build_ground_truth
+from src.common.data import load_data, wire_attributes
+from src.common.retrieval import load_db, rank
 
-ROOT = Path(__file__).resolve().parent.parent
+from src.common.paths import PROJECT_ROOT as ROOT
 
 def compute_dynamic_weights(v_ref, pos_names, neg_names, axes):
       """
@@ -54,7 +54,7 @@ def dynamic_query(v_ref, pos_names, neg_names, axes, alpha=1.0, cap=2.0):
 
 def combined_query(v_ref, pos_names, neg_names, axes, alpha=1.0, cap=2.0):
     """Contrastive shift first, then dynamic weights conditioned on the shifted vector."""
-    from baselines import contrastive_query
+    from src.solution_a.directions import contrastive_query
     v1 = contrastive_query(v_ref, pos_names, neg_names, axes, alpha=alpha)
     return dynamic_query(v1, pos_names, neg_names, axes, alpha=alpha, cap=cap)
 
