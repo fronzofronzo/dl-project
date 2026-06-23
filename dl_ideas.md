@@ -126,7 +126,7 @@ Questo rende l'edit **adattivo per ogni immagine** = esattamente l'"adattamento 
 
 **Riferimenti collegati:**
 
-- **Dynamic Weighted Combiner for Mixed-Modal Image Retrieval** — Wu et al., AAAI 2024. Peso *non fisso* tra reference e modifica, deciso dall'input: modifica leggera → domina la reference, modifica forte → domina il testo. Stesso principio dei pesi `wᵢ` qui. Differenza: loro pesi **appresi** (training), il nostro punto (c) è **no-training** (coseni puri).
+- **Dynamic Weighted Combiner for Mixed-Modal Image Retrieval** — Huang et al., AAAI 2024. Peso *non fisso* tra reference e modifica, deciso dall'input: modifica leggera → domina la reference, modifica forte → domina il testo. Stesso principio dei pesi `wᵢ` qui. Differenza: loro pesi **appresi** (training), il nostro punto (c) è **no-training** (coseni puri).
 - **Learning with Multi-modal Gradient Attention for Explainable Composed Image Retrieval** — Chen et al., arXiv:2308.16649. Attenzione/pesi condizionati **sia su immagine sia su testo** → supporta il carattere dinamico dipendente da `v_ref`.
 - **Heterogeneous Uncertainty-Guided CIR** — arXiv:2601.11393. Dynamic weighting per-campione guidato dall'incertezza.
 

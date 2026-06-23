@@ -29,15 +29,16 @@ RESULTS = ROOT / "results"
 KS = (1, 5, 10)
 ALPHAS = (3.0, 4.0, 5.0)
 LAMBDAS = (0.0, 1.0, 2.0, 4.0)
+ORTHS = ("off", "full", "conflict")   # Gram–Schmidt ablation: none / all dirs / opposite-sign only
 POOL = 200
 
 
-def eval_config(gts, axes, db, probes, alpha, lam):
+def eval_config(gts, axes, db, probes, alpha, lam, orth):
     rankings_per_query = {}
     for qgt in gts:
         rpq = rankings_per_query.setdefault(qgt.query, {})
         for s in qgt.gt:
-            v_t = contrastive_query(db[s], qgt.pos, qgt.neg, axes, alpha=alpha)
+            v_t = contrastive_query(db[s], qgt.pos, qgt.neg, axes, alpha=alpha, orth=orth)
             rpq[s] = negative_rerank(v_t, db, qgt.neg, probes,
                                      exclude={s}, k=max(KS), pool=POOL, lam=lam)
         assert len(rpq) == len(qgt.gt), f"{qgt.query!r}: source count mismatch"
@@ -56,41 +57,43 @@ def main():
     probes = build_image_probes(db, ds.attr.float(), attr_index, names)
 
     print(f"DB {tuple(db.shape)} | {len(gts)} queries | {len(names)} attrs "
-          f"| alphas {ALPHAS} | lambdas {LAMBDAS}")
+          f"| alphas {ALPHAS} | lambdas {LAMBDAS} | orth {ORTHS}")
 
     sweep = {}
     best = None
     for a in ALPHAS:
         for lam in LAMBDAS:
-            rows = eval_config(gts, axes, db, probes, a, lam)
-            m = rows["MACRO"]
-            sweep[(a, lam)] = m
-            print(f"  alpha={a:<4} lam={lam:<4}  "
-                  f"R@1={m['recall@1']:.3f}  R@5={m['recall@5']:.3f}  R@10={m['recall@10']:.3f}")
-            key = (m["recall@1"], m["recall@5"])
-            if best is None or key > best[2]:
-                best = ((a, lam), rows, key)
-    (best_a, best_lam), best_rows = best[0], best[1]
-    print(f"best alpha={best_a} lambda={best_lam} (by R@1, tie R@5)")
+            for orth in ORTHS:
+                rows = eval_config(gts, axes, db, probes, a, lam, orth)
+                m = rows["MACRO"]
+                sweep[(a, lam, orth)] = m
+                print(f"  alpha={a:<4} lam={lam:<4} orth={orth:<8} "
+                      f"R@1={m['recall@1']:.3f}  R@5={m['recall@5']:.3f}  R@10={m['recall@10']:.3f}")
+                key = (m["recall@1"], m["recall@5"])
+                if best is None or key > best[2]:
+                    best = ((a, lam, orth), rows, key)
+    (best_a, best_lam, best_orth), best_rows = best[0], best[1]
+    print(f"best alpha={best_a} lambda={best_lam} orth={best_orth} (by R@1, tie R@5)")
 
     for k in KS:
         for q, r in best_rows.items():
             assert 0.0 <= r[f"recall@{k}"] <= 1.0 and 0.0 <= r[f"precision@{k}"] <= 1.0, q
     print("  ok  all metrics in [0,1]")
 
-    write_results(best_rows, best_a, best_lam, sweep)
+    write_results(best_rows, best_a, best_lam, best_orth, sweep)
 
 
-def write_results(rows, best_a, best_lam, sweep):
+def write_results(rows, best_a, best_lam, best_orth, sweep):
     RESULTS.mkdir(exist_ok=True)
     (RESULTS / "solution_a.json").write_text(
-        json.dumps({"best_alpha": best_a, "best_lambda": best_lam, "rows": rows}, indent=2))
+        json.dumps({"best_alpha": best_a, "best_lambda": best_lam,
+                    "best_orth": best_orth, "rows": rows}, indent=2))
 
     cols = [f"{m}@{k}" for k in KS for m in ("recall", "precision")]
     ordered = [q for q in rows if q != "MACRO"] + (["MACRO"] if "MACRO" in rows else [])
 
     lines = [f"# Solution A — contrastive + negative re-rank "
-             f"(best alpha={best_a}, lambda={best_lam})", "",
+             f"(best alpha={best_a}, lambda={best_lam}, orth={best_orth})", "",
              "| query | " + " | ".join(cols) + " | n_sources |",
              "|" + "---|" * (len(cols) + 2)]
     for q in ordered:
@@ -110,13 +113,13 @@ def write_results(rows, best_a, best_lam, sweep):
                              f"| {n['recall@5']:.3f} | {a['recall@5']:.3f} |")
     (RESULTS / "solution_a.md").write_text("\n".join(lines) + "\n")
 
-    sl = ["# Solution A — (alpha, lambda) sweep (MACRO)", "",
-          "| alpha | lambda | R@1 | R@5 | R@10 | P@1 | P@5 | P@10 |",
-          "|---|---|---|---|---|---|---|---|"]
-    for (a, lam) in sorted(sweep):
-        m = sweep[(a, lam)]
-        mark = " (best)" if (a, lam) == (best_a, best_lam) else ""
-        sl.append(f"| {a}{mark} | {lam} | {m['recall@1']:.3f} | {m['recall@5']:.3f} "
+    sl = ["# Solution A — (alpha, lambda, orth) sweep (MACRO)", "",
+          "| alpha | lambda | orth | R@1 | R@5 | R@10 | P@1 | P@5 | P@10 |",
+          "|---|---|---|---|---|---|---|---|---|"]
+    for (a, lam, orth) in sorted(sweep):
+        m = sweep[(a, lam, orth)]
+        mark = " (best)" if (a, lam, orth) == (best_a, best_lam, best_orth) else ""
+        sl.append(f"| {a}{mark} | {lam} | {orth} | {m['recall@1']:.3f} | {m['recall@5']:.3f} "
                   f"| {m['recall@10']:.3f} | {m['precision@1']:.3f} | {m['precision@5']:.3f} "
                   f"| {m['precision@10']:.3f} |")
     (RESULTS / "solution_a_sweep.md").write_text("\n".join(sl) + "\n")
