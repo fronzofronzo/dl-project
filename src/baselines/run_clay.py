@@ -12,6 +12,7 @@ import json
 from src.common.paths import PROJECT_ROOT as ROOT, EVAL_JSON
 from src.baselines.clay import clay_subspace, clay_rank, project_db
 from src.common.groundtruth import build_ground_truth
+from src.common.geometry import sphere_mean
 from src.common.metrics import evaluate_all
 from src.common.retrieval import load_db
 
@@ -20,11 +21,19 @@ KS = (1, 5, 10)
 KSVD = (10, 30, 50)          # top-k right singular vectors to keep
 
 
-def eval_ksvd(gts, db, k_svd):
+def eval_ksvd(gts, db, k_svd, mu_img, probe=False):
     rankings_per_query = {}
     for qgt in gts:
-        # subspace + DB projection built once per query (shared by all its sources)
-        P, mu = clay_subspace(qgt.pos, qgt.neg, k=k_svd)
+        # subspace + DB projection built once per query (shared by all its sources).
+        # mu_img aligns the text subspace into the image cone (modality-gap fix).
+        P, mu = clay_subspace(qgt.pos, qgt.neg, k=k_svd, mu_img=mu_img)
+        if probe:
+            # gap sanity: mean angle DB images -> tangency μ. Broken pipeline gives
+            # ~π/2 (1.57 rad); a correct alignment collapses it. Print once.
+            cos_t = (db @ mu).clamp(-1 + 1e-7, 1 - 1e-7)
+            print(f"  [probe] mean angle(img, μ) = {cos_t.acos().mean():.3f} rad "
+                  f"(broken ≈ 1.57; want small)")
+            probe = False
         db_proj = project_db(db, P, mu)
         rpq = rankings_per_query.setdefault(qgt.query, {})
         for s in qgt.gt:
@@ -36,12 +45,13 @@ def eval_ksvd(gts, db, k_svd):
 def main():
     gts = build_ground_truth(EVAL_JSON)
     db = load_db().float()
+    mu_img = sphere_mean(db)                  # image-cone mean for modality-gap alignment
     names = sorted({n for q in gts for n in (*q.pos, *q.neg)})
     print(f"DB {tuple(db.shape)} | {len(gts)} queries | {len(names)} attrs | k_svd {KSVD}")
 
     sweep, best = {}, None
-    for k_svd in KSVD:
-        rows = eval_ksvd(gts, db, k_svd)
+    for i, k_svd in enumerate(KSVD):
+        rows = eval_ksvd(gts, db, k_svd, mu_img, probe=(i == 0))
         m = rows["MACRO"]
         sweep[k_svd] = m
         print(f"  k_svd={k_svd:<3}  R@1={m['recall@1']:.3f}  R@5={m['recall@5']:.3f}  R@10={m['recall@10']:.3f}")

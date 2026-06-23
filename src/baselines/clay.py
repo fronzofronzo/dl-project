@@ -63,19 +63,32 @@ def build_condition_prompts(names):
     return prompts, spans
 
 
-def clay_subspace(pos_names, neg_names, k=50):
+def clay_subspace(pos_names, neg_names, k=50, mu_img=None):
     """Build the CLAY projection matrix P = V_k V_kᵀ and the tangent mean μ.
 
     Stacks ALL condition prompts (positive and negative, no sign), encodes them,
     Log-maps at their mean, runs one SVD, keeps the top-k right singular vectors.
     Returns (P [d,d], mu [d]). k is capped at the number of prompts.
+
+    Modality-gap alignment (CLAY's H rotation, previously skipped — the cause of
+    the broken R@1=0.002): text and image embeddings live in separate cones. The
+    text subspace V_k is only meaningful for image vectors if we first bring the
+    text cloud into the image cone. We approximate H as a translation by the gap
+    g = μ_img − μ_txt (Liang et al., "mind the gap"), then build the subspace at
+    the *aligned* mean. The returned μ then lives in the IMAGE cone, so the
+    downstream log-map of DB / reference images has small θ (valid) instead of
+    ~π/2 (degenerate). `mu_img` is the unit mean direction of the visual DB.
     """
     names = list(pos_names) + list(neg_names)
     prompts, _ = build_condition_prompts(names)
     _, z = encode_data(texts=prompts)               # [n, d], L2-normalized
     z = z.cpu().float()
 
-    mu = sphere_mean(z)                              # tangency point
+    mu_txt = sphere_mean(z)                          # text-cone mean
+    if mu_img is not None:
+        gap = mu_img.cpu().float() - mu_txt          # modality gap (≈ CLAY's H)
+        z = torch.nn.functional.normalize(z + gap, dim=1)  # align text -> image cone
+    mu = sphere_mean(z)                              # tangency point (image cone)
     tangent = torch.stack([log_map(mu, z[i]) for i in range(z.shape[0])])  # [n, d]
 
     # one SVD; right singular vectors V are the columns of Vh.T

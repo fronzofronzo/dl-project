@@ -1,0 +1,7 @@
+data/celeba
+CLAUDE.md
+.venv
+__pycache__/
+.DS_STORE
+data/_DS_STORE
+data/clip_features_train.pt

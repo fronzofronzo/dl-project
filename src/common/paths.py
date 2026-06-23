@@ -14,3 +14,4 @@ FEATURES = PROJECT_ROOT / "features"
 EVAL_JSON = DATA / "celeba_evaluation.json"
 DB_TEST = DATA / "clip_features_test.pt"
 DB_TRAIN = DATA / "clip_features_train.pt"  # extracted offline for Solution B training
+ATTRS_TRAIN = DATA / "celeba_attrs_train.pt"  # 40 binary attrs, row-aligned to DB_TRAIN
