@@ -40,15 +40,16 @@ class T1Phi(nn.Module):
     """
 
     def __init__(self, n_attr=N_ATTR, dim=DIM, d_model=256, n_heads=4, n_layers=1,
-                 gate="vector", residual="ambient"):
+                 gate="vector", residual="ambient", gate_hidden=256):
         """
-        n_attr    number of CelebA attributes (token table size)
-        dim       CLIP feature dim (v_ref / v_q), = 512
-        d_model   internal attention width
-        n_heads   attention heads
-        n_layers  cross-attention blocks (>1 = stacked, ablation)
-        gate      "vector" (512-dim FiLM) | "scalar" (single coeff)
-        residual  "ambient" | "tangent"  (tangent = Log/Exp around mean, ablation)
+        n_attr      number of CelebA attributes (token table size)
+        dim         CLIP feature dim (v_ref / v_q), = 512
+        d_model     internal attention width
+        n_heads     attention heads
+        n_layers    cross-attention blocks (>1 = stacked, ablation)
+        gate        "vector" (512-dim FiLM) | "scalar" (single coeff)
+        residual    "ambient" | "tangent"  (tangent = Exp map at v_ref, ablation)
+        gate_hidden hidden width of the FiLM gate MLP
         """
         super().__init__()
         self.dim = dim
@@ -70,8 +71,13 @@ class T1Phi(nn.Module):
         self.delta_proj = nn.Linear(d_model, dim)
 
         # (e) FiLM gate net: [v_ref ; cond summary] -> sigmoid gate (vector or scalar)
-        # TODO: small MLP; output dim = `dim` (vector) or 1 (scalar)
-        self.gate_net = None
+        gate_out = dim if gate == "vector" else 1
+        self.gate_net = nn.Sequential(
+            nn.Linear(dim + d_model, gate_hidden),
+            nn.ReLU(),
+            nn.Linear(gate_hidden, gate_out),
+            nn.Sigmoid(),                               # gate in [0, 1]
+        )
 
     # ------------------------------------------------------------------ #
     # components
@@ -106,12 +112,34 @@ class T1Phi(nn.Module):
         return attn_out.squeeze(1)                         # [B, d_model]
 
     def _gate(self, v_ref, cond_summary):
-        """(e) FiLM gate g(v_ref, conds) in [0,1], vector [B, dim] or scalar [B, 1]."""
-        raise NotImplementedError
+        """(e) FiLM gate g(v_ref, conds) in [0,1], vector [B, dim] or scalar [B, 1].
+
+        Doses the edit per input -> dynamic weighting (P2). cond_summary is the
+        attended condition vector from (c), so the gate sees both the reference and
+        what the conditions ask for.
+        """
+        x = torch.cat([v_ref, cond_summary], dim=1)       # [B, dim + d_model]
+        return self.gate_net(x)                            # [B, dim] or [B, 1]
 
     def _apply_residual(self, v_ref, delta, gate):
-        """v_q = v_ref + gate * delta (ambient) or the tangent-space variant."""
-        raise NotImplementedError
+        """Compose v_q from the reference and the gated edit. The `+ v_ref` residual
+        preserves identity; `gate` doses Δ (broadcast for the scalar gate).
+
+          ambient: v_q = v_ref + gate * delta
+          tangent: geodesic step from v_ref along the tangent-projected edit
+                   (Exp map anchored at v_ref); findings A: tangent ~= ambient.
+
+        Returns un-normalized v_q; forward() applies the final L2-normalize.
+        """
+        step = gate * delta                                # [B, dim], gate broadcasts
+        if self.residual == "ambient":
+            return v_ref + step
+
+        # tangent: anchor μ = v_ref per row, drop the radial part, Exp back
+        vr = F.normalize(v_ref, dim=1)
+        step = step - (step * vr).sum(dim=1, keepdim=True) * vr     # tangent component
+        r = step.norm(dim=1, keepdim=True).clamp_min(1e-7)
+        return vr * torch.cos(r) + (step / r) * torch.sin(r)
 
     # ------------------------------------------------------------------ #
     # contract
@@ -126,14 +154,23 @@ class T1Phi(nn.Module):
           cond_mask [B, C]    bool, True for real conditions
           -> v_q    [B, 512]  composed query, L2-normalized
         """
-        # (a) tokens   = self._build_tokens(cond_col, cond_sign, cond_mask)
-        # (b) q_token  = self.q_proj(v_ref)
-        # (c) summary  = self._attend(q_token, tokens, cond_mask)
-        # (d) delta    = self.delta_proj(summary)
-        # (e) gate     = self._gate(v_ref, summary)
-        #     v_q      = self._apply_residual(v_ref, delta, gate)
-        # return F.normalize(v_q, dim=1)
-        raise NotImplementedError
+        tokens = self._build_tokens(cond_col, cond_sign, cond_mask)   # (a) [B, C, d_model]
+        q_token = self.q_proj(v_ref)                                  # (b) [B, d_model]
+        summary = self._attend(q_token, tokens, cond_mask)            # (c) [B, d_model]
+
+        # rows with NO condition: every key is masked -> softmax over all -inf -> NaN.
+        # null the summary there so the gate/edit see a clean zero (empty-edit case).
+        summary = torch.nan_to_num(summary, nan=0.0)
+
+        delta = self.delta_proj(summary)                              # (d) [B, dim]
+        gate = self._gate(v_ref, summary)                             # (e) [B, dim]/[B, 1]
+
+        # force a no-op edit when there are no real conditions -> v_q == normalize(v_ref)
+        has_cond = cond_mask.any(dim=1, keepdim=True).to(delta.dtype)
+        delta = delta * has_cond
+
+        v_q = self._apply_residual(v_ref, delta, gate)               # residual + identity
+        return F.normalize(v_q, dim=1)
 
 
 # --------------------------------------------------------------------------- #
