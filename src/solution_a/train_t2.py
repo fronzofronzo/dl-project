@@ -30,9 +30,9 @@ from src.solution_a.run_t2 import eval_phi, write_results, attr_index_test
 # defaults (tunable; sweep later)
 STEPS = 6000
 BATCH = 256
-LR = 1e-3
+LR = 3e-4               # was 1e-3: loss plateaued+oscillated -> lower LR settles deeper
 TAU = 0.07
-LAM_ID = 0.3
+LAM_ID = 0.4           # was 0.3: anchor identity harder to help R@1 (top-1 match)
 LAM_ORTH = 0.1          # weight of the direction-disentangling orthogonality regularizer
 EVAL_EVERY = 100
 
