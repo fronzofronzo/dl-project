@@ -6,26 +6,29 @@ is self-supervised on CelebA-train attributes via the sampler; validation runs o
 the CelebA-test benchmark every `eval_every` steps; the best checkpoint (by R@1,
 tie R@5) is saved and its results table frozen.
 
-Run from repo root:  python -m src.solution_b.train
+Run from repo root:
+  python -m src.solution_b.train          # MLP baseline (default)
+  python -m src.solution_b.train t1       # T1 cross-attention
 """
+import sys
 import torch
 from torch import optim
-from torchvision.datasets import CelebA
 
-from src.common.paths import PROJECT_ROOT as ROOT, EVAL_JSON, DB_TEST
+from src.common.paths import EVAL_JSON, DB_TEST
 from src.common.groundtruth import build_ground_truth
 from src.common.retrieval import load_db
 from src.solution_b.sampler import TrainData
 from src.solution_b.losses import total_loss
 from src.solution_b.phi import MLPPhi
+from src.solution_b.t1_attention import T1Phi
 from src.solution_b.run import eval_phi, write_results, attr_index_test, RESULTS
 
 # defaults (tunable; sweep later)
-STEPS = 3000
+STEPS = 6000
 BATCH = 256
 LR = 1e-3
 TAU = 0.07
-LAM_ID = 0.1
+LAM_ID = 0.3
 EVAL_EVERY = 500
 
 
@@ -60,16 +63,24 @@ def train(phi, data, gts, db, attr_index, device, *, steps=STEPS, batch=BATCH,
     return best_state, best_rows
 
 
+def build_phi(name):
+    if name == "mlp":
+        return MLPPhi()
+    if name == "t1":
+        return T1Phi()
+    raise ValueError(f"unknown phi: {name!r} (choices: mlp, t1)")
+
+
 def main(name="mlp"):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f"device: {device}")
+    print(f"device: {device}  phi: {name}")
 
     data = TrainData(device=device)
     db = load_db(DB_TEST).float().to(device)
     gts = build_ground_truth(EVAL_JSON)
     attr_index = attr_index_test()
 
-    phi = MLPPhi()
+    phi = build_phi(name)
     best_state, best_rows = train(phi, data, gts, db, attr_index, device)
 
     RESULTS.mkdir(exist_ok=True)
@@ -80,4 +91,5 @@ def main(name="mlp"):
 
 
 if __name__ == "__main__":
-    main()
+    name = sys.argv[1] if len(sys.argv) > 1 else "mlp"
+    main(name)

@@ -95,8 +95,7 @@ class T1Phi(nn.Module):
         sign = self.sign_emb(sign_idx)                    # [B, C, d_model]
         tokens = attr + sign                              # signed tokens
         tokens = tokens * cond_mask.unsqueeze(-1)         # zero out padded tokens
-        return tokens   
-        raise NotImplementedError
+        return tokens
 
     def _attend(self, q_token, tokens, cond_mask):
         """(c) cross-attention: query=v_ref token, key/value=condition tokens.
@@ -183,7 +182,55 @@ class T1Phi(nn.Module):
 #   - backward: finite, non-zero grads on every parameter
 # --------------------------------------------------------------------------- #
 def _smoke():
-    raise NotImplementedError
+    torch.manual_seed(0)
+    B, C, DIM = 4, 3, 512
+    phi = T1Phi()
+    phi.eval()
+
+    v_ref     = F.normalize(torch.randn(B, DIM), dim=1)
+    cond_col  = torch.randint(0, N_ATTR, (B, C))
+    cond_sign = torch.where(torch.rand(B, C) > 0.5, 1.0, -1.0)
+    cond_mask = torch.ones(B, C, dtype=torch.bool)
+
+    # 1. output shape + L2-norm
+    v_q = phi(v_ref, cond_col, cond_sign, cond_mask)
+    assert v_q.shape == (B, DIM), f"shape {v_q.shape}"
+    assert torch.allclose(v_q.norm(dim=1), torch.ones(B), atol=1e-5), "not L2-normalized"
+    print("  ok  output shape and L2-norm")
+
+    # 2. permutation-invariance: shuffling condition order must not change v_q
+    perm = torch.randperm(C)
+    v_q_perm = phi(v_ref, cond_col[:, perm], cond_sign[:, perm], cond_mask[:, perm])
+    assert torch.allclose(v_q, v_q_perm, atol=1e-5), "not permutation-invariant"
+    print("  ok  permutation-invariance")
+
+    # 3. mask honesty: adding padded columns must not change v_q
+    C2 = C + 2
+    col_pad  = torch.cat([cond_col,  torch.zeros(B, 2, dtype=torch.long)], dim=1)
+    sign_pad = torch.cat([cond_sign, torch.zeros(B, 2)], dim=1)
+    mask_pad = torch.cat([cond_mask, torch.zeros(B, 2, dtype=torch.bool)], dim=1)
+    v_q_pad = phi(v_ref, col_pad, sign_pad, mask_pad)
+    assert torch.allclose(v_q, v_q_pad, atol=1e-5), "mask not honored"
+    print("  ok  mask honesty (extra padded columns ignored)")
+
+    # 4. empty edit: all conditions masked -> v_q ~ normalize(v_ref)
+    mask_empty = torch.zeros(B, C, dtype=torch.bool)
+    v_q_empty = phi(v_ref, cond_col, cond_sign, mask_empty)
+    assert torch.allclose(v_q_empty, F.normalize(v_ref, dim=1), atol=1e-5), \
+        "empty-condition case: v_q should equal normalize(v_ref)"
+    print("  ok  empty edit (v_q == normalize(v_ref) when no conditions)")
+
+    # 5. backward: finite loss, non-zero gradients on all parameters
+    phi.train()
+    v_q = phi(v_ref, cond_col, cond_sign, cond_mask)
+    loss = (1 - (v_q * F.normalize(v_ref, dim=1)).sum(dim=1)).mean()
+    loss.backward()
+    for name, p in phi.named_parameters():
+        assert p.grad is not None and torch.isfinite(p.grad).all() and p.grad.norm() > 0, \
+            f"bad grad on {name}"
+    print(f"  ok  backward (loss={loss.item():.4f}, all grads finite and non-zero)")
+
+    print("smoke test passed.")
 
 
 if __name__ == "__main__":
