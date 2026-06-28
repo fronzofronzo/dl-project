@@ -34,7 +34,7 @@ LR = 1e-3
 TAU = 0.07
 LAM_ID = 0.3
 LAM_ORTH = 0.1          # weight of the direction-disentangling orthogonality regularizer
-EVAL_EVERY = 500
+EVAL_EVERY = 100
 
 
 def train(phi, data, gts, db, attr_index, device, *, steps=STEPS, batch=BATCH,
