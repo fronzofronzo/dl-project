@@ -1,0 +1,15 @@
+device: cuda  phi: t1
+step   500 | loss 5.999 (nce 5.868 id 0.437) | R@1 0.050 R@5 0.171 R@10 0.271
+step  1000 | loss 5.884 (nce 5.750 id 0.448) | R@1 0.061 R@5 0.212 R@10 0.312
+step  1500 | loss 5.843 (nce 5.688 id 0.515) | R@1 0.071 R@5 0.236 R@10 0.333
+step  2000 | loss 5.741 (nce 5.599 id 0.472) | R@1 0.064 R@5 0.214 R@10 0.324
+step  2500 | loss 5.642 (nce 5.495 id 0.488) | R@1 0.080 R@5 0.237 R@10 0.339
+step  3000 | loss 5.692 (nce 5.527 id 0.549) | R@1 0.073 R@5 0.240 R@10 0.352
+step  3500 | loss 5.597 (nce 5.440 id 0.523) | R@1 0.072 R@5 0.219 R@10 0.329
+step  4000 | loss 5.745 (nce 5.583 id 0.540) | R@1 0.071 R@5 0.218 R@10 0.337
+step  4500 | loss 5.660 (nce 5.501 id 0.528) | R@1 0.074 R@5 0.225 R@10 0.333
+step  5000 | loss 5.631 (nce 5.479 id 0.506) | R@1 0.076 R@5 0.224 R@10 0.332
+step  5500 | loss 5.630 (nce 5.483 id 0.490) | R@1 0.072 R@5 0.229 R@10 0.355
+step  6000 | loss 5.788 (nce 5.637 id 0.502) | R@1 0.066 R@5 0.213 R@10 0.323
+best checkpoint -> /home/disi/dl-project/results/phi_t1.pt
+frozen -> /home/disi/dl-project/results/solution_b_t1.md
