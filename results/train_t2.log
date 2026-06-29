@@ -1,0 +1,20 @@
+nohup: ignoring input
+device: cuda  phi: t2
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/disi/dl-project/src/solution_a/train_t2.py", line 94, in <module>
+    main()
+  File "/home/disi/dl-project/src/solution_a/train_t2.py", line 81, in main
+    attr_index = attr_index_test()
+                 ^^^^^^^^^^^^^^^^^
+  File "/home/disi/dl-project/src/solution_a/run_t2.py", line 32, in attr_index_test
+    ds = CelebA(root=str(ROOT / "data"), split="test", download=False)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/disi/dl-project/.venv/lib/python3.12/site-packages/torchvision/datasets/celeba.py", line 101, in __init__
+    attr = self._load_csv("list_attr_celeba.txt", header=1)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/disi/dl-project/.venv/lib/python3.12/site-packages/torchvision/datasets/celeba.py", line 133, in _load_csv
+    data_int = [list(map(int, i)) for i in data]
+                ^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
