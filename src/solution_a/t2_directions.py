@@ -1,4 +1,4 @@
-"""T2 — Learned image-space directions + dynamic weight gate Φ (owner: person 2).
+"""T2 — Input-conditioned image-space directions + dynamic weight gate Φ (owner: person 2).
 
 The training twin of the no-training Solution A. Solution A failed for three
 MEASURED reasons (results/findings_2026-06-19.md):
@@ -10,20 +10,30 @@ T2 LEARNS, directly in image space, both the directions and the weights, so all
 three bugs disappear by construction. Closes the four CLAY limits:
 
   P1 sign        -> a positive constraint ADDS d_i, a negative SUBTRACTS it
-  P2 weighting   -> per-condition weight from an MLP w = f(v_ref, attr_id)
-  P3 interaction -> orthogonality regularizer on D (learned Gram–Schmidt)
-  P4 dynamic     -> weights computed from the ACTUAL v_ref, per input
+  P2 weighting   -> per-condition magnitude from an MLP w = f(v_ref, attr_id)
+  P3 interaction -> correlation-aware regularizer on D (learned, structure-matched)
+  P4 dynamic     -> BOTH the magnitude AND the DIRECTION depend on the actual v_ref
 
-Implements the shared Φ contract from src/solution_b/phi.py so it drops into the
-shared train.py / run.py loop unchanged:
+DESIGN HISTORY (results/solution_a_t2.md): the first T2 used a single GLOBAL
+direction per attribute (d_i fixed for every face), only the magnitude saw v_ref.
+That rigid-axis bottleneck made T2 lose to the plain MLP baseline on composed /
+entangled queries (+Chubby&-Young 0.159 vs 0.534) while still winning on single
+directional attributes (+Smiling 0.198 vs 0.087). Fix (I1): the direction itself
+is now input-conditioned via a small per-attribute low-rank correction predicted
+from v_ref, so "add smiling" can point differently on different faces — strictly
+more expressive than the rigid axis, still per-attribute interpretable, and
+ablatable (cond_dir=False recovers the rigid T2 exactly).
+
+Implements the shared Φ contract from src/solution_b/phi.py:
 
     forward(v_ref, cond_col, cond_sign, cond_mask) -> v_q
 
 CLIP stays frozen; only Φ is trained. The residual on v_ref preserves identity.
 
 Composition (ambient):
-    v_q = normalize( v_ref + scale * Σ_i  w_i · s_i · d̂_i )
-with d̂_i = D[col_i] / ‖D[col_i]‖, w_i = softplus(MLP(v_ref, attr_emb[col_i])).
+    v_q = normalize( v_ref + scale * Σ_i  w_i · s_i · d̂_i(v_ref) )
+with d̂_i(v_ref) = normalize( D[col_i] + U[col_i]ᵀ·dir_net(v_ref, attr_emb[col_i]) ),
+     w_i        = softplus( weight_net(v_ref, attr_emb[col_i]) ).
 
 NOTE: pad vs attribute-0 — cond_col==0 is BOTH padding and attribute 0
 (5_o_Clock_Shadow). The truth is cond_mask; never use cond_col==0 as "is pad".
@@ -39,38 +49,57 @@ DIM = 512
 
 
 class T2Phi(nn.Module):
-    """Learned-direction fusion module Φ_T2.
+    """Input-conditioned learned-direction fusion module Φ_T2.
 
     Pipeline (forward):
-      (a) pick + unit-normalize learned directions   d̂ = normalize(D[col])
-      (b) dynamic per-condition weight               w = softplus(MLP(v_ref, attr_emb[col]))
-      (c) signed, masked composition                 edit = scale * Σ w·s·d̂
-      (d) residual + identity anchor                  v_q = v_ref + edit  -> normalize
+      (a) per-attribute base direction + v_ref-conditioned low-rank correction (I1)
+          d̂ = normalize(D[col] + U[col]ᵀ·dir_net(v_ref, attr_emb[col]))
+      (b) dynamic per-condition magnitude   w = softplus(weight_net(v_ref, attr_emb[col]))
+      (c) signed, masked composition        edit = scale * Σ w·s·d̂
+      (d) residual + identity anchor         v_q = v_ref + edit  -> normalize
     """
 
-    def __init__(self, n_attr=N_ATTR, dim=DIM, w_emb=64, w_hidden=256,
-                 residual="ambient"):
+    def __init__(self, n_attr=N_ATTR, dim=DIM, w_emb=64, w_hidden=256, rank=16,
+                 residual="ambient", cond_dir=True):
         """
         n_attr     number of CelebA attributes (direction-dictionary rows)
         dim        CLIP feature dim (v_ref / v_q / directions), = 512
-        w_emb      width of the attribute embedding fed to the weight MLP
-        w_hidden   hidden width of the dynamic-weight MLP
+        w_emb      width of the attribute embedding fed to both heads
+        w_hidden   hidden width of the MLP heads
+        rank       low-rank dimension of the input-conditioned direction correction (I1)
         residual   "ambient" | "tangent"  (tangent = Exp map at v_ref, ablation)
+        cond_dir   I1 toggle: True = directions depend on v_ref (low-rank correction),
+                   False = rigid global directions (the original T2, for ablation)
         """
         super().__init__()
         self.dim = dim
         self.residual = residual
+        self.cond_dir = cond_dir
+        self.rank = rank
 
-        # (a) learned direction dictionary, IMAGE space (not text prompts)
+        # (a) base learned direction dictionary, IMAGE space (warm-startable, I3)
         self.D = nn.Parameter(torch.randn(n_attr, dim) * 0.02)
 
-        # (b) dynamic-weight head: f(v_ref, attr_id) -> scalar weight per condition
+        # shared attribute embedding feeding both heads
         self.attr_emb = nn.Embedding(n_attr, w_emb)
+
+        # (b) dynamic-magnitude head: f(v_ref, attr_id) -> non-negative scalar weight
         self.weight_net = nn.Sequential(
             nn.Linear(dim + w_emb, w_hidden),
             nn.ReLU(),
             nn.Linear(w_hidden, 1),
         )
+
+        # (I1) input-conditioned direction correction: per-attribute low-rank basis U,
+        # whose coordinates are predicted from (v_ref, attr_emb). delta = coords·U.
+        # Init small so the correction starts ~0 (d ~= base D) and the net grows it.
+        if cond_dir:
+            self.U = nn.Parameter(torch.randn(n_attr, rank, dim) * (0.02 / rank ** 0.5))
+            self.dir_net = nn.Sequential(
+                nn.Linear(dim + w_emb, w_hidden),
+                nn.ReLU(),
+                nn.Linear(w_hidden, rank),
+            )
 
         # learned global edit magnitude (mirrors Solution A's alpha; here trainable)
         self.log_scale = nn.Parameter(torch.zeros(()))
@@ -78,27 +107,41 @@ class T2Phi(nn.Module):
     # ------------------------------------------------------------------ #
     # components
     # ------------------------------------------------------------------ #
-    def _weights(self, v_ref, cond_col):
-        """(b) per-condition non-negative weight w = softplus(MLP(v_ref, attr_emb)).
-
-          v_ref    [B, dim]
-          cond_col [B, C] long
-        Returns w [B, C] >= 0. Dynamic (depends on v_ref) -> P2 + P4.
-        """
-        B, C = cond_col.shape
+    def _feat(self, v_ref, cond_col):
+        """Shared head input [B, C, dim + w_emb] = (v_ref broadcast || attr_emb)."""
+        C = cond_col.shape[1]
         emb = self.attr_emb(cond_col)                       # [B, C, w_emb]
         vref = v_ref.unsqueeze(1).expand(-1, C, -1)         # [B, C, dim]
-        x = torch.cat([vref, emb], dim=-1)                  # [B, C, dim + w_emb]
+        return torch.cat([vref, emb], dim=-1)               # [B, C, dim + w_emb]
+
+    def _weights(self, x):
+        """(b) per-condition non-negative magnitude w = softplus(MLP). [B, C] >= 0."""
         return F.softplus(self.weight_net(x)).squeeze(-1)   # [B, C]
 
-    def _compose(self, v_ref, cond_col, cond_sign, cond_mask, w):
+    def _directions(self, cond_col, x):
+        """(a) unit directions, OPTIONALLY conditioned on v_ref (I1). -> [B, C, dim].
+
+        rigid (cond_dir=False): d̂ = normalize(D[col]) — global, same per face.
+        I1    (cond_dir=True) : d̂ = normalize(D[col] + Σ_r coords_r · U[col, r]),
+              coords = dir_net(v_ref, attr_emb) -> the direction REORIENTS per input,
+              killing the rigid-axis bottleneck (B1) while keeping per-attribute D
+              interpretable and ablatable.
+        """
+        d = self.D[cond_col]                                # [B, C, dim] base
+        if self.cond_dir:
+            coords = self.dir_net(x)                        # [B, C, rank]
+            U = self.U[cond_col]                            # [B, C, rank, dim]
+            delta = (coords.unsqueeze(-1) * U).sum(dim=2)   # [B, C, dim]
+            d = d + delta
+        return F.normalize(d, dim=-1)                       # [B, C, dim] unit
+
+    def _compose(self, dirs, cond_sign, cond_mask, w):
         """(c) signed, masked, weighted sum of unit directions -> edit [B, dim].
 
         Polarity is explicit: +1 adds d̂, -1 subtracts it (P1). Padded columns are
         zeroed by cond_mask, so the count of conditions is variable and the result
         is permutation-invariant.
         """
-        dirs = F.normalize(self.D[cond_col], dim=-1)        # [B, C, dim] unit dirs
         coeff = w * cond_sign * cond_mask.to(w.dtype)       # [B, C] signed, padded->0
         edit = (coeff.unsqueeze(-1) * dirs).sum(dim=1)      # [B, dim]
         return self.log_scale.exp() * edit
@@ -121,26 +164,43 @@ class T2Phi(nn.Module):
         r = step.norm(dim=1, keepdim=True).clamp_min(1e-7)
         return vr * torch.cos(r) + (step / r) * torch.sin(r)
 
-    def ortho_reg(self):
-        """Orthogonality regularizer on D (the learned Gram–Schmidt, fixes P3).
+    def ortho_reg(self, target=None):
+        """Decorrelation regularizer on the base dictionary D (CLAY limit P3).
 
-        Mean squared off-diagonal of the unit-direction Gram matrix. Pushes
-        correlated/opposite axes apart (e.g. Blond_Hair vs Black_Hair share the
-        hair-colour axis) so composed constraints stop double-counting/cancelling.
-        Added to the loss by the train loop (see losses.py note).
+        Mean squared off-diagonal of (Gram(D̂) − target), where Gram is the
+        unit-direction cosine matrix.
+
+          target=None : push every off-diagonal to 0 (plain orthogonality — the
+                        original T2 reg). MEASURED to over-decorrelate: findings
+                        show correlated same-sign attributes carry real signal, so
+                        forcing all pairs apart hurts (+Eyeglasses&+Smiling −0.023).
+          target=C    : push the direction geometry toward the empirical attribute
+                        CORRELATION matrix C (from train labels). Attributes that
+        
+                        genuinely co-occur are ALLOWED to correlate; only truly
+                        independent / anti-correlated pairs are pushed apart. This
+                        is the conflict-aware version (I2) — structure-matched, not
+                        a blanket identity.
+
+        Added to the loss by the train loop.
         """
         Dn = F.normalize(self.D, dim=1)                     # [n_attr, dim]
-        gram = Dn @ Dn.t()                                  # [n_attr, n_attr]
-        off = gram - torch.diag(torch.diagonal(gram))       # zero the diagonal
+        gram = Dn @ Dn.t()                                  # [n_attr, n_attr] in [-1,1]
+        diff = gram if target is None else gram - target.to(gram)
+        off = diff - torch.diag(torch.diagonal(diff))       # zero the diagonal
         n = gram.shape[0]
         return off.pow(2).sum() / (n * (n - 1))
 
     @torch.no_grad()
     def load_directions(self, axes):
-        """Optional warm start: copy contrastive text axes into D (rows by column
-        index). `axes` is a [n_attr, dim] tensor row-aligned to attribute columns.
-        Convergence trick from next_steps.md; off by default (image-space-from-
-        scratch is the whole point of T2 — it avoids the text cone)."""
+        """Hybrid warm start (I3): copy image-space probe axes into the base D.
+
+        `axes` is a [n_attr, dim] tensor row-aligned to attribute columns, built
+        from the TRAIN split as d_img(attr) = mean(F[label=1]) − mean(F[label=0])
+        (image-image difference -> modality-gap-free, findings §3). Injects real
+        attribute structure instead of starting D from random·0.02; the net then
+        only has to refine, not discover, the directions.
+        """
         self.D.copy_(axes.to(self.D).float())
 
     # ------------------------------------------------------------------ #
@@ -156,9 +216,11 @@ class T2Phi(nn.Module):
           cond_mask [B, C]    bool, True for real conditions
           -> v_q    [B, 512]  composed query, L2-normalized
         """
-        w = self._weights(v_ref, cond_col)                            # (b) [B, C]
-        edit = self._compose(v_ref, cond_col, cond_sign, cond_mask, w)  # (a)+(c) [B, dim]
-        v_q = self._apply_residual(v_ref, edit)                       # (d) residual
+        x = self._feat(v_ref, cond_col)                       # [B, C, dim + w_emb]
+        w = self._weights(x)                                  # (b) [B, C]
+        dirs = self._directions(cond_col, x)                  # (a) [B, C, dim] (I1)
+        edit = self._compose(dirs, cond_sign, cond_mask, w)   # (c) [B, dim]
+        v_q = self._apply_residual(v_ref, edit)               # (d) residual
         return F.normalize(v_q, dim=1)
 
 
@@ -169,7 +231,8 @@ class T2Phi(nn.Module):
 #   - permutation-invariance: shuffling the condition order leaves v_q unchanged
 #   - mask honesty: extra padded columns leave v_q unchanged
 #   - empty edit: cond_mask all False -> v_q ~ normalize(v_ref)
-#   - ortho_reg: finite scalar, contributes a gradient to D
+#   - I1 actually conditions: direction changes with v_ref (cond_dir=True)
+#   - ortho_reg (both targetless and correlation-matched): finite scalar
 #   - backward: finite, non-zero grads on every parameter
 # --------------------------------------------------------------------------- #
 def _smoke():
@@ -210,12 +273,28 @@ def _smoke():
         "empty-condition case: v_q should equal normalize(v_ref)"
     print("  ok  empty edit (v_q == normalize(v_ref) when no conditions)")
 
-    # 5. ortho_reg: finite non-negative scalar
-    reg = phi.ortho_reg()
-    assert reg.ndim == 0 and torch.isfinite(reg) and reg >= 0, f"bad ortho_reg {reg}"
-    print(f"  ok  ortho_reg (= {reg.item():.4f}, finite scalar)")
+    # 5. I1 conditions on v_ref: same constraint, different reference -> different dir
+    v_ref2 = F.normalize(torch.randn(B, DIM), dim=1)
+    one_col = cond_col[:, :1]
+    x1 = phi._feat(v_ref,  one_col); x2 = phi._feat(v_ref2, one_col)
+    d1 = phi._directions(one_col, x1); d2 = phi._directions(one_col, x2)
+    assert not torch.allclose(d1, d2, atol=1e-4), "I1 inactive: direction ignores v_ref"
+    rigid = T2Phi(cond_dir=False)
+    xr = rigid._feat(v_ref, one_col)
+    dr1 = rigid._directions(one_col, xr)
+    dr2 = rigid._directions(one_col, rigid._feat(v_ref2, one_col))
+    assert torch.allclose(dr1, dr2, atol=1e-6), "rigid ablation should ignore v_ref"
+    print("  ok  I1 input-conditioned directions (rigid ablation static)")
 
-    # 6. backward: finite loss (+ortho), non-zero gradients on all parameters
+    # 6. ortho_reg: finite non-negative scalar, both targetless and correlation-matched
+    reg0 = phi.ortho_reg()
+    target = torch.eye(N_ATTR)                              # dummy correlation target
+    regc = phi.ortho_reg(target=target)
+    for r in (reg0, regc):
+        assert r.ndim == 0 and torch.isfinite(r) and r >= 0, f"bad ortho_reg {r}"
+    print(f"  ok  ortho_reg (targetless={reg0.item():.4f}, corr-target={regc.item():.4f})")
+
+    # 7. backward: finite loss (+ortho), non-zero gradients on all parameters
     phi.train()
     v_q = phi(v_ref, cond_col, cond_sign, cond_mask)
     loss = (1 - (v_q * F.normalize(v_ref, dim=1)).sum(dim=1)).mean() + 0.1 * phi.ortho_reg()
@@ -223,7 +302,9 @@ def _smoke():
     for name, p in phi.named_parameters():
         assert p.grad is not None and torch.isfinite(p.grad).all() and p.grad.norm() > 0, \
             f"bad grad on {name}"
-    print(f"  ok  backward (loss={loss.item():.4f}, all grads finite and non-zero)")
+    n_params = sum(p.numel() for p in phi.parameters())
+    print(f"  ok  backward (loss={loss.item():.4f}, all grads finite/non-zero, "
+          f"{n_params:,} params)")
 
     print("smoke test passed.")
 
