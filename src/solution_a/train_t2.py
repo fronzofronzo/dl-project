@@ -28,7 +28,8 @@ from src.common.groundtruth import build_ground_truth
 from src.common.retrieval import load_db
 from src.solution_b.sampler import TrainData          # shared backbone (self-supervised data)
 from src.solution_b.losses import total_loss          # shared backbone (InfoNCE + identity)
-from src.solution_a.t2_directions import T2Phi
+from src.solution_a.t2_directions import T2Phi, N_ATTR, DIM
+from src.solution_a.directions import build_direction_axes
 from src.solution_a.run_t2 import eval_phi, write_results, attr_index_test
 
 # defaults (tunable; sweep later)
@@ -44,6 +45,7 @@ EVAL_EVERY = 100
 WARM_START = True       # I3: warm-start D from the train image-space probe
 ORTHO_MODE = "corr"     # I2: "corr" (label-correlation target) | "zero" (orthogonal) | "off"
 QUEUE_N = 0             # I4: extra random train negatives per step (0 = off)
+HYBRID = False          # hybrid conditioning: add the CLIP text axis via a learned bridge
 
 
 def image_axes(F_train, L_train):
@@ -80,6 +82,17 @@ def queue_negatives(F_train, n):
     return F_train[idx]
 
 
+def text_axes_tensor(attr_index, device):
+    """Hybrid conditioning: per-attribute CLIP TEXT axis z_with − z_without, as a
+    [n_attr, dim] tensor row-aligned to attribute columns. Frozen; a learned bridge
+    in the model maps it text->image cone."""
+    axes = build_direction_axes(list(attr_index.keys()))    # {name: [dim]}
+    T = torch.zeros(N_ATTR, DIM)
+    for n, c in attr_index.items():
+        T[c] = axes[n]
+    return T.to(device)
+
+
 def train(phi, data, gts, db, attr_index, device, *, steps=STEPS, batch=BATCH,
           lr=LR, tau=TAU, lam_id=LAM_ID, lam_orth=LAM_ORTH, eval_every=EVAL_EVERY,
           ortho_target=None, queue_n=QUEUE_N):
@@ -112,9 +125,10 @@ def train(phi, data, gts, db, attr_index, device, *, steps=STEPS, batch=BATCH,
         if step % eval_every == 0 or step == steps:
             rows = eval_phi(phi, db, gts, attr_index, device)
             m = rows["MACRO"]
+            gate = f" gate {phi.text_gate.item():+.3f}" if getattr(phi, "hybrid", False) else ""
             print(f"step {step:>5} | loss {loss.item():.3f} "
                   f"(nce {parts['info_nce']:.3f} id {parts['identity']:.3f} "
-                  f"orth {reg.item():.3f}) | "
+                  f"orth {reg.item():.3f}{gate}) | "
                   f"R@1 {m['recall@1']:.3f} R@5 {m['recall@5']:.3f} R@10 {m['recall@10']:.3f}")
             key = (m["recall@1"], m["recall@5"])
             if key > best_key:
@@ -124,21 +138,26 @@ def train(phi, data, gts, db, attr_index, device, *, steps=STEPS, batch=BATCH,
     return best_state, best_rows
 
 
-def main(name="t2"):
+def main(name=None):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    name = name or ("t2_hybrid" if HYBRID else "t2")        # don't overwrite the visual run
     print(f"device: {device}  phi: {name}  "
-          f"[warm_start={WARM_START} ortho={ORTHO_MODE} queue_n={QUEUE_N}]")
+          f"[warm_start={WARM_START} ortho={ORTHO_MODE} queue_n={QUEUE_N} hybrid={HYBRID}]")
 
     data = TrainData(device=device)
     db = load_db(DB_TEST).float().to(device)
     gts = build_ground_truth(EVAL_JSON)
     attr_index = attr_index_test()
 
-    phi = T2Phi()
+    phi = T2Phi(hybrid=HYBRID)
 
     if WARM_START:                                          # I3
         phi.load_directions(image_axes(data.F, data.L))
         print("  warm-started D from train image-space probe")
+
+    if HYBRID:                                              # hybrid conditioning
+        phi.set_text_axes(text_axes_tensor(attr_index, device))
+        print("  loaded frozen CLIP text axes (text->image bridge will train)")
 
     lam_orth = LAM_ORTH                                     # I2
     if ORTHO_MODE == "corr":

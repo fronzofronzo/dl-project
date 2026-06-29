@@ -60,7 +60,7 @@ class T2Phi(nn.Module):
     """
 
     def __init__(self, n_attr=N_ATTR, dim=DIM, w_emb=64, w_hidden=256, rank=16,
-                 residual="ambient", cond_dir=True):
+                 residual="ambient", cond_dir=True, hybrid=False):
         """
         n_attr     number of CelebA attributes (direction-dictionary rows)
         dim        CLIP feature dim (v_ref / v_q / directions), = 512
@@ -70,11 +70,16 @@ class T2Phi(nn.Module):
         residual   "ambient" | "tangent"  (tangent = Exp map at v_ref, ablation)
         cond_dir   I1 toggle: True = directions depend on v_ref (low-rank correction),
                    False = rigid global directions (the original T2, for ablation)
+        hybrid     HYBRID conditioning: blend a FROZEN CLIP text axis per attribute
+                   into the visual direction through a learned text->image bridge
+                   (text_proj) gated by text_gate (init 0 = pure visual). Off =
+                   visual-only (the current T2). Call set_text_axes() after init.
         """
         super().__init__()
         self.dim = dim
         self.residual = residual
         self.cond_dir = cond_dir
+        self.hybrid = hybrid
         self.rank = rank
 
         # (a) base learned direction dictionary, IMAGE space (warm-startable, I3)
@@ -100,6 +105,14 @@ class T2Phi(nn.Module):
                 nn.ReLU(),
                 nn.Linear(w_hidden, rank),
             )
+
+        # HYBRID conditioning: a learned bridge maps the FROZEN CLIP text axis from
+        # the text cone into the image cone; text_gate (init 0) blends it into the
+        # visual direction. Bridge + gate are trained; the text axes stay frozen.
+        if hybrid:
+            self.text_proj = nn.Linear(dim, dim, bias=False)
+            self.text_gate = nn.Parameter(torch.zeros(()))
+            self.register_buffer("text_axes", torch.zeros(n_attr, dim))
 
         # learned global edit magnitude (mirrors Solution A's alpha; here trainable)
         self.log_scale = nn.Parameter(torch.zeros(()))
@@ -127,12 +140,15 @@ class T2Phi(nn.Module):
               killing the rigid-axis bottleneck (B1) while keeping per-attribute D
               interpretable and ablatable.
         """
-        d = self.D[cond_col]                                # [B, C, dim] base
+        d = self.D[cond_col]                                # [B, C, dim] base (visual)
         if self.cond_dir:
             coords = self.dir_net(x)                        # [B, C, rank]
             U = self.U[cond_col]                            # [B, C, rank, dim]
             delta = (coords.unsqueeze(-1) * U).sum(dim=2)   # [B, C, dim]
             d = d + delta
+        if self.hybrid:                                     # text axis -> image cone
+            t = self.text_proj(self.text_axes[cond_col])    # [B, C, dim]
+            d = d + self.text_gate * t
         return F.normalize(d, dim=-1)                       # [B, C, dim] unit
 
     def _compose(self, dirs, cond_sign, cond_mask, w):
@@ -202,6 +218,16 @@ class T2Phi(nn.Module):
         only has to refine, not discover, the directions.
         """
         self.D.copy_(axes.to(self.D).float())
+
+    @torch.no_grad()
+    def set_text_axes(self, axes):
+        """Hybrid conditioning: store the FROZEN CLIP text axes [n_attr, dim],
+        row-aligned to attribute columns (axes[col] = z_with − z_without for that
+        attribute). The text→image bridge (text_proj) and gate (text_gate) are
+        trained on top; these axes themselves never receive gradient."""
+        if not self.hybrid:
+            raise RuntimeError("set_text_axes called but hybrid=False")
+        self.text_axes.copy_(axes.to(self.text_axes).float())
 
     # ------------------------------------------------------------------ #
     # contract
@@ -305,6 +331,24 @@ def _smoke():
     n_params = sum(p.numel() for p in phi.parameters())
     print(f"  ok  backward (loss={loss.item():.4f}, all grads finite/non-zero, "
           f"{n_params:,} params)")
+
+    # 8. hybrid conditioning: gate init 0 -> text branch inert; nonzero gate moves
+    #    the direction; bridge + gate receive gradient.
+    hyb = T2Phi(hybrid=True)
+    hyb.set_text_axes(F.normalize(torch.randn(N_ATTR, DIM), dim=1))
+    hyb.eval()
+    d_gate0 = hyb._directions(cond_col, hyb._feat(v_ref, cond_col))      # text_gate == 0
+    with torch.no_grad():
+        hyb.text_gate.fill_(0.5)
+    d_gate = hyb._directions(cond_col, hyb._feat(v_ref, cond_col))
+    assert not torch.allclose(d_gate0, d_gate, atol=1e-5), "text branch inert with gate!=0"
+    hyb.train()
+    vq = hyb(v_ref, cond_col, cond_sign, cond_mask)
+    ((1 - (vq * F.normalize(v_ref, dim=1)).sum(1)).mean()).backward()
+    assert hyb.text_gate.grad is not None and hyb.text_gate.grad.abs() > 0, "no grad on text_gate"
+    assert hyb.text_proj.weight.grad.norm() > 0, "no grad on text_proj"
+    assert hyb.text_axes.grad is None, "text axes must stay frozen"
+    print("  ok  hybrid conditioning (gate gates text, bridge trains, axes frozen)")
 
     print("smoke test passed.")
 
