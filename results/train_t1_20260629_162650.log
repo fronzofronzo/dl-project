@@ -1,0 +1,5 @@
+device: cuda  phi: t1
+steps=3500  batch=256  lr=0.001  lr_min=0.0  tau=0.07  lam_id=0.3  k_hardneg=8  eval_every=500
+step   500 | lr 9.50e-04 | loss 6.524 (nce 6.389 id 0.449) | R@1 0.048 R@5 0.171 R@10 0.259
+step  1000 | lr 8.12e-04 | loss 6.388 (nce 6.255 id 0.446) | R@1 0.060 R@5 0.193 R@10 0.297
+step  1500 | lr 6.11e-04 | loss 6.362 (nce 6.221 id 0.470) | R@1 0.059 R@5 0.203 R@10 0.301
