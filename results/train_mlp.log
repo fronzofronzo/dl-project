@@ -1,0 +1,2 @@
+device: cuda  phi: mlp
+steps=3500  batch=256  lr=0.001  lr_min=0.0  tau=0.07  lam_id=0.3  eval_every=500

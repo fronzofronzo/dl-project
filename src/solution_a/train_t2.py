@@ -22,6 +22,7 @@ Run from repo root:  python -m src.solution_a.train_t2
 """
 import torch
 from torch import optim
+from datetime import datetime
 
 from src.common.paths import EVAL_JSON, DB_TEST, RESULTS
 from src.common.groundtruth import build_ground_truth
@@ -36,7 +37,8 @@ from src.solution_a.run_t2 import eval_phi, write_results, attr_index_test
 STEPS = 6000
 BATCH = 256
 LR = 3e-4               # was 1e-3: loss plateaued+oscillated -> lower LR settles deeper
-TAU = 0.07
+LR_MIN = 3e-4           # == LR: disabilita cosine (LR costante)
+TAU = 0.05              # sharper InfoNCE than default 0.07
 LAM_ID = 0.4           # anchor identity hard to help R@1 (top-1 match)
 LAM_ORTH = 0.1          # weight of the direction-decorrelation regularizer (I2)
 EVAL_EVERY = 100
@@ -45,7 +47,7 @@ EVAL_EVERY = 100
 WARM_START = True       # I3: warm-start D from the train image-space probe
 ORTHO_MODE = "corr"     # I2: "corr" (label-correlation target) | "zero" (orthogonal) | "off"
 QUEUE_N = 0             # I4: extra random train negatives per step (0 = off)
-HYBRID = False          # hybrid conditioning: add the CLIP text axis via a learned bridge
+HYBRID = True
 
 
 def image_axes(F_train, L_train):
@@ -93,12 +95,20 @@ def text_axes_tensor(attr_index, device):
     return T.to(device)
 
 
-def train(phi, data, gts, db, attr_index, device, *, steps=STEPS, batch=BATCH,
-          lr=LR, tau=TAU, lam_id=LAM_ID, lam_orth=LAM_ORTH, eval_every=EVAL_EVERY,
-          ortho_target=None, queue_n=QUEUE_N):
+def _log(msg, log_file):
+    print(msg)
+    log_file.write(msg + "\n")
+    log_file.flush()
+
+
+def train(phi, data, gts, db, attr_index, device, log_file, *, steps=STEPS, batch=BATCH,
+          lr=LR, lr_min=LR_MIN, tau=TAU, lam_id=LAM_ID, lam_orth=LAM_ORTH,
+          eval_every=EVAL_EVERY, ortho_target=None, queue_n=QUEUE_N):
     """Optimize Φ_T2; return (best_state_dict, best_rows). CLIP/DB untouched."""
     phi.to(device)
     opt = optim.Adam(phi.parameters(), lr=lr)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=steps, eta_min=lr_min)
+    # lr_min == lr -> constant LR (cosine disabled); lr_min < lr -> cosine decay
     best_key, best_rows, best_state = (-1.0, -1.0), None, None
 
     for step in range(1, steps + 1):
@@ -121,15 +131,18 @@ def train(phi, data, gts, db, attr_index, device, *, steps=STEPS, batch=BATCH,
         opt.zero_grad()
         loss.backward()
         opt.step()
+        scheduler.step()
 
         if step % eval_every == 0 or step == steps:
             rows = eval_phi(phi, db, gts, attr_index, device)
             m = rows["MACRO"]
+            cur_lr = scheduler.get_last_lr()[0]
             gate = f" gate {phi.text_gate.item():+.3f}" if getattr(phi, "hybrid", False) else ""
-            print(f"step {step:>5} | loss {loss.item():.3f} "
-                  f"(nce {parts['info_nce']:.3f} id {parts['identity']:.3f} "
-                  f"orth {reg.item():.3f}{gate}) | "
-                  f"R@1 {m['recall@1']:.3f} R@5 {m['recall@5']:.3f} R@10 {m['recall@10']:.3f}")
+            msg = (f"step {step:>5} | lr {cur_lr:.2e} | loss {loss.item():.3f} "
+                   f"(nce {parts['info_nce']:.3f} id {parts['identity']:.3f} "
+                   f"orth {reg.item():.3f}{gate}) | "
+                   f"R@1 {m['recall@1']:.3f} R@5 {m['recall@5']:.3f} R@10 {m['recall@10']:.3f}")
+            _log(msg, log_file)
             key = (m["recall@1"], m["recall@5"])
             if key > best_key:
                 best_key, best_rows = key, rows
@@ -140,43 +153,57 @@ def train(phi, data, gts, db, attr_index, device, *, steps=STEPS, batch=BATCH,
 
 def main(name=None):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    name = name or ("t2_hybrid" if HYBRID else "t2")        # don't overwrite the visual run
-    print(f"device: {device}  phi: {name}  "
-          f"[warm_start={WARM_START} ortho={ORTHO_MODE} queue_n={QUEUE_N} hybrid={HYBRID}]")
-
-    data = TrainData(device=device)
-    db = load_db(DB_TEST).float().to(device)
-    gts = build_ground_truth(EVAL_JSON)
-    attr_index = attr_index_test()
-
-    phi = T2Phi(hybrid=HYBRID)
-
-    if WARM_START:                                          # I3
-        phi.load_directions(image_axes(data.F, data.L))
-        print("  warm-started D from train image-space probe")
-
-    if HYBRID:                                              # hybrid conditioning
-        phi.set_text_axes(text_axes_tensor(attr_index, device))
-        print("  loaded frozen CLIP text axes (text->image bridge will train)")
-
-    lam_orth = LAM_ORTH                                     # I2
-    if ORTHO_MODE == "corr":
-        ortho_target = attr_corr(data.L).to(device)
-    elif ORTHO_MODE == "zero":
-        ortho_target = None
-    elif ORTHO_MODE == "off":
-        ortho_target, lam_orth = None, 0.0
-    else:
-        raise ValueError(f"ORTHO_MODE must be corr|zero|off, got {ORTHO_MODE!r}")
-
-    best_state, best_rows = train(phi, data, gts, db, attr_index, device,
-                                  lam_orth=lam_orth, ortho_target=ortho_target)
+    name = name or ("t2_hybrid_tau05_fixed" if HYBRID else "t2_tau05_fixed")
+    hparams = dict(steps=STEPS, batch=BATCH, lr=LR, lr_min=LR_MIN, tau=TAU,
+                   lam_id=LAM_ID, lam_orth=LAM_ORTH, eval_every=EVAL_EVERY,
+                   warm_start=WARM_START, ortho_mode=ORTHO_MODE,
+                   queue_n=QUEUE_N, hybrid=HYBRID)
 
     RESULTS.mkdir(exist_ok=True)
-    ckpt = RESULTS / f"phi_{name}.pt"
-    torch.save(best_state, ckpt)
-    print(f"best checkpoint -> {ckpt}")
-    write_results(best_rows, name)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_path = RESULTS / f"train_{name}_{ts}.log"
+
+    with open(log_path, "w") as log_file:
+        header = (f"device: {device}  phi: {name}\n"
+                  + "  ".join(f"{k}={v}" for k, v in hparams.items()))
+        _log(header, log_file)
+
+        data = TrainData(device=device)
+        db = load_db(DB_TEST).float().to(device)
+        gts = build_ground_truth(EVAL_JSON)
+        attr_index = attr_index_test()
+
+        phi = T2Phi(hybrid=HYBRID)
+
+        if WARM_START:                                          # I3
+            phi.load_directions(image_axes(data.F, data.L))
+            _log("  warm-started D from train image-space probe", log_file)
+
+        if HYBRID:                                              # hybrid conditioning
+            phi.set_text_axes(text_axes_tensor(attr_index, device))
+            _log("  loaded frozen CLIP text axes (text->image bridge will train)", log_file)
+
+        lam_orth = LAM_ORTH                                     # I2
+        if ORTHO_MODE == "corr":
+            ortho_target = attr_corr(data.L).to(device)
+            _log("  ortho_reg: correlation-aware (I2)", log_file)
+        elif ORTHO_MODE == "zero":
+            ortho_target = None
+            _log("  ortho_reg: plain orthogonality", log_file)
+        elif ORTHO_MODE == "off":
+            ortho_target, lam_orth = None, 0.0
+            _log("  ortho_reg: off", log_file)
+        else:
+            raise ValueError(f"ORTHO_MODE must be corr|zero|off, got {ORTHO_MODE!r}")
+
+        best_state, best_rows = train(phi, data, gts, db, attr_index, device, log_file,
+                                      lam_orth=lam_orth, ortho_target=ortho_target)
+
+        ckpt = RESULTS / f"phi_{name}_{ts}.pt"
+        torch.save(best_state, ckpt)
+        _log(f"best checkpoint -> {ckpt}", log_file)
+        write_results(best_rows, name)
+        _log(f"frozen -> {RESULTS / f'solution_a_{name}.md'}", log_file)
 
 
 if __name__ == "__main__":

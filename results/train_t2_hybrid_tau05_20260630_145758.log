@@ -1,0 +1,67 @@
+device: cuda  phi: t2_hybrid_tau05
+steps=6000  batch=256  lr=0.0003  lr_min=0.0  tau=0.05  lam_id=0.4  lam_orth=0.1  eval_every=100  warm_start=True  ortho_mode=corr  queue_n=0  hybrid=True
+  warm-started D from train image-space probe
+  loaded frozen CLIP text axes (text->image bridge will train)
+  ortho_reg: correlation-aware (I2)
+step   100 | lr 3.00e-04 | loss 6.022 (nce 5.898 id 0.299 orth 0.043 gate -0.006) | R@1 0.055 R@5 0.172 R@10 0.255
+step   200 | lr 2.99e-04 | loss 5.867 (nce 5.737 id 0.320 orth 0.025 gate -0.008) | R@1 0.055 R@5 0.181 R@10 0.262
+step   300 | lr 2.98e-04 | loss 6.071 (nce 5.932 id 0.343 orth 0.016 gate -0.006) | R@1 0.054 R@5 0.179 R@10 0.270
+step   400 | lr 2.97e-04 | loss 5.941 (nce 5.799 id 0.351 orth 0.011 gate -0.009) | R@1 0.063 R@5 0.182 R@10 0.267
+step   500 | lr 2.95e-04 | loss 5.984 (nce 5.852 id 0.328 orth 0.009 gate -0.011) | R@1 0.058 R@5 0.183 R@10 0.281
+step   600 | lr 2.93e-04 | loss 5.927 (nce 5.786 id 0.350 orth 0.008 gate -0.009) | R@1 0.058 R@5 0.190 R@10 0.284
+step   700 | lr 2.90e-04 | loss 5.825 (nce 5.676 id 0.371 orth 0.007 gate -0.008) | R@1 0.055 R@5 0.189 R@10 0.285
+step   800 | lr 2.87e-04 | loss 5.923 (nce 5.775 id 0.369 orth 0.006 gate -0.010) | R@1 0.064 R@5 0.197 R@10 0.291
+step   900 | lr 2.84e-04 | loss 5.669 (nce 5.518 id 0.377 orth 0.006 gate -0.009) | R@1 0.067 R@5 0.195 R@10 0.293
+step  1000 | lr 2.80e-04 | loss 5.724 (nce 5.572 id 0.377 orth 0.006 gate -0.008) | R@1 0.064 R@5 0.197 R@10 0.296
+step  1100 | lr 2.76e-04 | loss 5.699 (nce 5.545 id 0.385 orth 0.007 gate -0.009) | R@1 0.065 R@5 0.196 R@10 0.301
+step  1200 | lr 2.71e-04 | loss 5.601 (nce 5.445 id 0.390 orth 0.007 gate -0.010) | R@1 0.068 R@5 0.208 R@10 0.310
+step  1300 | lr 2.67e-04 | loss 5.822 (nce 5.664 id 0.393 orth 0.007 gate -0.012) | R@1 0.069 R@5 0.207 R@10 0.313
+step  1400 | lr 2.61e-04 | loss 5.622 (nce 5.462 id 0.398 orth 0.007 gate -0.010) | R@1 0.068 R@5 0.204 R@10 0.312
+step  1500 | lr 2.56e-04 | loss 5.695 (nce 5.530 id 0.412 orth 0.007 gate -0.009) | R@1 0.067 R@5 0.204 R@10 0.318
+step  1600 | lr 2.50e-04 | loss 5.904 (nce 5.750 id 0.384 orth 0.007 gate -0.011) | R@1 0.073 R@5 0.216 R@10 0.317
+step  1700 | lr 2.44e-04 | loss 5.766 (nce 5.608 id 0.393 orth 0.007 gate -0.014) | R@1 0.065 R@5 0.217 R@10 0.328
+step  1800 | lr 2.38e-04 | loss 5.738 (nce 5.571 id 0.416 orth 0.007 gate -0.013) | R@1 0.070 R@5 0.215 R@10 0.321
+step  1900 | lr 2.32e-04 | loss 5.578 (nce 5.421 id 0.390 orth 0.007 gate -0.012) | R@1 0.072 R@5 0.215 R@10 0.317
+step  2000 | lr 2.25e-04 | loss 5.767 (nce 5.606 id 0.401 orth 0.008 gate -0.009) | R@1 0.081 R@5 0.236 R@10 0.338
+step  2100 | lr 2.18e-04 | loss 5.736 (nce 5.571 id 0.410 orth 0.008 gate -0.009) | R@1 0.074 R@5 0.229 R@10 0.341
+step  2200 | lr 2.11e-04 | loss 5.545 (nce 5.382 id 0.408 orth 0.008 gate -0.009) | R@1 0.076 R@5 0.225 R@10 0.340
+step  2300 | lr 2.04e-04 | loss 5.816 (nce 5.652 id 0.409 orth 0.008 gate -0.011) | R@1 0.080 R@5 0.218 R@10 0.333
+step  2400 | lr 1.96e-04 | loss 5.729 (nce 5.568 id 0.401 orth 0.008 gate -0.012) | R@1 0.071 R@5 0.221 R@10 0.322
+step  2500 | lr 1.89e-04 | loss 5.553 (nce 5.395 id 0.393 orth 0.008 gate -0.012) | R@1 0.076 R@5 0.216 R@10 0.322
+step  2600 | lr 1.81e-04 | loss 5.751 (nce 5.593 id 0.392 orth 0.008 gate -0.014) | R@1 0.075 R@5 0.217 R@10 0.314
+step  2700 | lr 1.73e-04 | loss 5.531 (nce 5.366 id 0.410 orth 0.008 gate -0.013) | R@1 0.077 R@5 0.230 R@10 0.323
+step  2800 | lr 1.66e-04 | loss 5.815 (nce 5.651 id 0.406 orth 0.008 gate -0.012) | R@1 0.079 R@5 0.232 R@10 0.330
+step  2900 | lr 1.58e-04 | loss 5.560 (nce 5.397 id 0.407 orth 0.008 gate -0.011) | R@1 0.080 R@5 0.225 R@10 0.330
+step  3000 | lr 1.50e-04 | loss 5.771 (nce 5.614 id 0.391 orth 0.008 gate -0.013) | R@1 0.080 R@5 0.230 R@10 0.328
+step  3100 | lr 1.42e-04 | loss 5.695 (nce 5.531 id 0.409 orth 0.008 gate -0.012) | R@1 0.079 R@5 0.218 R@10 0.322
+step  3200 | lr 1.34e-04 | loss 5.900 (nce 5.725 id 0.433 orth 0.008 gate -0.013) | R@1 0.083 R@5 0.227 R@10 0.334
+step  3300 | lr 1.27e-04 | loss 5.647 (nce 5.482 id 0.411 orth 0.008 gate -0.012) | R@1 0.081 R@5 0.228 R@10 0.341
+step  3400 | lr 1.19e-04 | loss 5.577 (nce 5.409 id 0.418 orth 0.008 gate -0.011) | R@1 0.089 R@5 0.236 R@10 0.356
+step  3500 | lr 1.11e-04 | loss 5.678 (nce 5.514 id 0.407 orth 0.008 gate -0.011) | R@1 0.083 R@5 0.233 R@10 0.342
+step  3600 | lr 1.04e-04 | loss 5.747 (nce 5.590 id 0.391 orth 0.008 gate -0.010) | R@1 0.082 R@5 0.234 R@10 0.349
+step  3700 | lr 9.62e-05 | loss 5.583 (nce 5.412 id 0.425 orth 0.008 gate -0.012) | R@1 0.083 R@5 0.235 R@10 0.348
+step  3800 | lr 8.90e-05 | loss 5.851 (nce 5.696 id 0.386 orth 0.008 gate -0.012) | R@1 0.082 R@5 0.238 R@10 0.353
+step  3900 | lr 8.19e-05 | loss 5.657 (nce 5.491 id 0.413 orth 0.008 gate -0.012) | R@1 0.078 R@5 0.231 R@10 0.347
+step  4000 | lr 7.50e-05 | loss 5.696 (nce 5.528 id 0.418 orth 0.008 gate -0.012) | R@1 0.076 R@5 0.234 R@10 0.343
+step  4100 | lr 6.83e-05 | loss 5.514 (nce 5.348 id 0.413 orth 0.008 gate -0.012) | R@1 0.076 R@5 0.233 R@10 0.345
+step  4200 | lr 6.18e-05 | loss 5.693 (nce 5.531 id 0.402 orth 0.008 gate -0.012) | R@1 0.078 R@5 0.231 R@10 0.345
+step  4300 | lr 5.56e-05 | loss 5.571 (nce 5.408 id 0.406 orth 0.008 gate -0.012) | R@1 0.080 R@5 0.230 R@10 0.342
+step  4400 | lr 4.96e-05 | loss 5.663 (nce 5.491 id 0.428 orth 0.008 gate -0.012) | R@1 0.080 R@5 0.235 R@10 0.346
+step  4500 | lr 4.39e-05 | loss 5.597 (nce 5.412 id 0.461 orth 0.008 gate -0.012) | R@1 0.079 R@5 0.233 R@10 0.348
+step  4600 | lr 3.85e-05 | loss 5.665 (nce 5.495 id 0.422 orth 0.008 gate -0.012) | R@1 0.077 R@5 0.231 R@10 0.340
+step  4700 | lr 3.34e-05 | loss 5.623 (nce 5.462 id 0.400 orth 0.008 gate -0.012) | R@1 0.074 R@5 0.230 R@10 0.339
+step  4800 | lr 2.86e-05 | loss 5.699 (nce 5.531 id 0.418 orth 0.008 gate -0.012) | R@1 0.077 R@5 0.230 R@10 0.341
+step  4900 | lr 2.42e-05 | loss 5.665 (nce 5.494 id 0.424 orth 0.008 gate -0.012) | R@1 0.078 R@5 0.231 R@10 0.342
+step  5000 | lr 2.01e-05 | loss 5.670 (nce 5.493 id 0.440 orth 0.008 gate -0.012) | R@1 0.076 R@5 0.233 R@10 0.339
+step  5100 | lr 1.63e-05 | loss 5.616 (nce 5.442 id 0.433 orth 0.008 gate -0.012) | R@1 0.078 R@5 0.233 R@10 0.341
+step  5200 | lr 1.30e-05 | loss 5.568 (nce 5.391 id 0.441 orth 0.008 gate -0.012) | R@1 0.078 R@5 0.233 R@10 0.338
+step  5300 | lr 9.96e-06 | loss 5.547 (nce 5.378 id 0.419 orth 0.008 gate -0.012) | R@1 0.078 R@5 0.231 R@10 0.342
+step  5400 | lr 7.34e-06 | loss 5.534 (nce 5.362 id 0.427 orth 0.008 gate -0.012) | R@1 0.079 R@5 0.231 R@10 0.342
+step  5500 | lr 5.11e-06 | loss 5.576 (nce 5.412 id 0.409 orth 0.008 gate -0.012) | R@1 0.079 R@5 0.231 R@10 0.341
+step  5600 | lr 3.28e-06 | loss 5.582 (nce 5.415 id 0.414 orth 0.008 gate -0.012) | R@1 0.079 R@5 0.230 R@10 0.344
+step  5700 | lr 1.85e-06 | loss 5.753 (nce 5.595 id 0.392 orth 0.008 gate -0.012) | R@1 0.079 R@5 0.230 R@10 0.347
+step  5800 | lr 8.22e-07 | loss 5.629 (nce 5.466 id 0.404 orth 0.008 gate -0.012) | R@1 0.079 R@5 0.230 R@10 0.345
+step  5900 | lr 2.06e-07 | loss 5.594 (nce 5.427 id 0.417 orth 0.008 gate -0.012) | R@1 0.079 R@5 0.231 R@10 0.345
+step  6000 | lr 0.00e+00 | loss 5.642 (nce 5.478 id 0.410 orth 0.008 gate -0.012) | R@1 0.079 R@5 0.230 R@10 0.345
+best checkpoint -> /home/disi/dl-project/results/phi_t2_hybrid_tau05_20260630_145758.pt
+frozen -> /home/disi/dl-project/results/solution_a_t2_hybrid_tau05.md

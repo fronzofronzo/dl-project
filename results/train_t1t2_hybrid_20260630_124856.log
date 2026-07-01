@@ -1,0 +1,13 @@
+device: cuda  phi: t1t2_hybrid
+steps=6000  batch=256  lr=0.0003  lr_min=0.0  tau=0.07  lam_id=0.4  lam_orth=0.1  k_hardneg=4  eval_every=500  warm_start=True  ortho_mode=corr  hybrid=True
+  warm-started D from train image-space probe
+  loaded frozen CLIP text axes
+  ortho_reg: correlation-aware (I2)
+step   500 | lr 2.95e-04 | loss 5.859 (nce 5.730 id 0.320 orth 0.010 gate +0.004) | R@1 0.054 R@5 0.189 R@10 0.282
+step  1000 | lr 2.80e-04 | loss 5.737 (nce 5.572 id 0.411 orth 0.008 gate -0.001) | R@1 0.056 R@5 0.189 R@10 0.298
+step  1500 | lr 2.56e-04 | loss 5.763 (nce 5.611 id 0.376 orth 0.007 gate +0.000) | R@1 0.060 R@5 0.213 R@10 0.325
+step  2000 | lr 2.25e-04 | loss 5.688 (nce 5.520 id 0.419 orth 0.008 gate +0.000) | R@1 0.061 R@5 0.199 R@10 0.309
+step  2500 | lr 1.89e-04 | loss 5.715 (nce 5.552 id 0.406 orth 0.007 gate +0.001) | R@1 0.061 R@5 0.216 R@10 0.327
+step  3000 | lr 1.50e-04 | loss 5.755 (nce 5.589 id 0.413 orth 0.007 gate -0.001) | R@1 0.062 R@5 0.224 R@10 0.330
+step  3500 | lr 1.11e-04 | loss 5.706 (nce 5.542 id 0.407 orth 0.007 gate +0.000) | R@1 0.059 R@5 0.209 R@10 0.317
+step  4000 | lr 7.50e-05 | loss 5.722 (nce 5.564 id 0.392 orth 0.007 gate -0.001) | R@1 0.063 R@5 0.212 R@10 0.320

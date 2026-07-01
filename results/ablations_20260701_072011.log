@@ -1,0 +1,63 @@
+device: cuda  steps=6000 batch=256 lr=0.0003 tau=0.07 lam_id=0.4 lam_orth=0.1 eval_every=500
+T2 hybrid baseline: R@1=0.090 R@5=0.240 R@10=0.349
+
+=== t2_hybrid_abl_i1  cond_dir=False warm_start=True ortho=corr hybrid=True ===
+  warm-started D
+  ortho_reg: correlation-aware
+  step   500 | loss 6.037 (nce 5.924 id 0.278 orth 0.023 gate -0.064) | R@1 0.059 R@5 0.181 R@10 0.261
+  step  1000 | loss 6.184 (nce 6.074 id 0.271 orth 0.024 gate -0.068) | R@1 0.059 R@5 0.177 R@10 0.263
+  step  1500 | loss 6.166 (nce 6.042 id 0.304 orth 0.024 gate -0.071) | R@1 0.058 R@5 0.191 R@10 0.287
+  step  2000 | loss 6.089 (nce 5.976 id 0.278 orth 0.025 gate -0.076) | R@1 0.059 R@5 0.185 R@10 0.272
+  step  2500 | loss 6.108 (nce 5.976 id 0.322 orth 0.025 gate -0.077) | R@1 0.061 R@5 0.178 R@10 0.261
+  step  3000 | loss 6.083 (nce 5.965 id 0.287 orth 0.025 gate -0.083) | R@1 0.059 R@5 0.176 R@10 0.264
+  step  3500 | loss 6.129 (nce 6.001 id 0.314 orth 0.024 gate -0.083) | R@1 0.059 R@5 0.185 R@10 0.273
+  step  4000 | loss 6.149 (nce 6.030 id 0.292 orth 0.024 gate -0.083) | R@1 0.059 R@5 0.181 R@10 0.270
+  step  4500 | loss 6.089 (nce 5.972 id 0.285 orth 0.024 gate -0.089) | R@1 0.065 R@5 0.189 R@10 0.272
+  step  5000 | loss 5.994 (nce 5.881 id 0.278 orth 0.024 gate -0.091) | R@1 0.056 R@5 0.176 R@10 0.266
+  step  5500 | loss 6.174 (nce 6.059 id 0.283 orth 0.024 gate -0.096) | R@1 0.060 R@5 0.192 R@10 0.286
+  step  6000 | loss 6.057 (nce 5.941 id 0.284 orth 0.024 gate -0.096) | R@1 0.057 R@5 0.180 R@10 0.272
+  checkpoint -> /home/disi/dl-project/results/phi_t2_hybrid_abl_i1.pt
+  results   -> /home/disi/dl-project/results/solution_a_t2_hybrid_abl_i1.md
+
+=== t2_hybrid_abl_i3  cond_dir=True warm_start=False ortho=corr hybrid=True ===
+  D initialized randomly
+  ortho_reg: correlation-aware
+  step   500 | loss 5.976 (nce 5.856 id 0.296 orth 0.016 gate -0.033) | R@1 0.064 R@5 0.197 R@10 0.293
+  step  1000 | loss 5.804 (nce 5.675 id 0.321 orth 0.007 gate -0.042) | R@1 0.054 R@5 0.200 R@10 0.303
+  step  1500 | loss 5.951 (nce 5.822 id 0.322 orth 0.003 gate -0.042) | R@1 0.057 R@5 0.207 R@10 0.307
+  step  2000 | loss 5.717 (nce 5.561 id 0.390 orth 0.002 gate -0.047) | R@1 0.065 R@5 0.213 R@10 0.314
+  step  2500 | loss 5.862 (nce 5.718 id 0.361 orth 0.001 gate -0.043) | R@1 0.072 R@5 0.209 R@10 0.310
+  step  3000 | loss 5.829 (nce 5.676 id 0.382 orth 0.001 gate -0.046) | R@1 0.080 R@5 0.227 R@10 0.337
+  step  3500 | loss 5.940 (nce 5.803 id 0.342 orth 0.001 gate -0.047) | R@1 0.071 R@5 0.208 R@10 0.311
+  step  4000 | loss 5.698 (nce 5.551 id 0.368 orth 0.001 gate -0.048) | R@1 0.071 R@5 0.217 R@10 0.332
+  step  4500 | loss 5.869 (nce 5.727 id 0.356 orth 0.001 gate -0.049) | R@1 0.069 R@5 0.225 R@10 0.341
+  step  5000 | loss 5.806 (nce 5.651 id 0.386 orth 0.001 gate -0.055) | R@1 0.074 R@5 0.231 R@10 0.346
+  step  5500 | loss 5.782 (nce 5.619 id 0.408 orth 0.001 gate -0.052) | R@1 0.072 R@5 0.219 R@10 0.328
+  step  6000 | loss 5.688 (nce 5.533 id 0.388 orth 0.001 gate -0.052) | R@1 0.075 R@5 0.234 R@10 0.339
+  checkpoint -> /home/disi/dl-project/results/phi_t2_hybrid_abl_i3.pt
+  results   -> /home/disi/dl-project/results/solution_a_t2_hybrid_abl_i3.md
+
+=== t2_hybrid_abl_i2  cond_dir=True warm_start=True ortho=off hybrid=True ===
+  warm-started D
+  ortho_reg: off
+  step   500 | loss 6.035 (nce 5.908 id 0.317 orth 0.074 gate +0.030) | R@1 0.061 R@5 0.203 R@10 0.299
+  step  1000 | loss 5.963 (nce 5.828 id 0.336 orth 0.045 gate +0.030) | R@1 0.071 R@5 0.197 R@10 0.292
+  step  1500 | loss 5.973 (nce 5.838 id 0.338 orth 0.034 gate +0.030) | R@1 0.073 R@5 0.200 R@10 0.303
+  step  2000 | loss 5.850 (nce 5.701 id 0.375 orth 0.028 gate +0.034) | R@1 0.074 R@5 0.212 R@10 0.318
+  step  2500 | loss 5.886 (nce 5.738 id 0.371 orth 0.025 gate +0.031) | R@1 0.077 R@5 0.230 R@10 0.325
+  step  3000 | loss 5.830 (nce 5.690 id 0.351 orth 0.023 gate +0.030) | R@1 0.082 R@5 0.240 R@10 0.347
+  step  3500 | loss 5.711 (nce 5.571 id 0.349 orth 0.022 gate +0.027) | R@1 0.079 R@5 0.228 R@10 0.339
+  step  4000 | loss 5.916 (nce 5.773 id 0.358 orth 0.021 gate +0.030) | R@1 0.080 R@5 0.240 R@10 0.351
+  step  4500 | loss 5.801 (nce 5.631 id 0.423 orth 0.021 gate +0.025) | R@1 0.075 R@5 0.237 R@10 0.351
+  step  5000 | loss 5.824 (nce 5.665 id 0.399 orth 0.020 gate +0.024) | R@1 0.070 R@5 0.226 R@10 0.342
+  step  5500 | loss 5.750 (nce 5.601 id 0.372 orth 0.020 gate +0.023) | R@1 0.071 R@5 0.228 R@10 0.338
+  step  6000 | loss 5.730 (nce 5.576 id 0.385 orth 0.020 gate +0.020) | R@1 0.083 R@5 0.239 R@10 0.349
+  checkpoint -> /home/disi/dl-project/results/phi_t2_hybrid_abl_i2.pt
+  results   -> /home/disi/dl-project/results/solution_a_t2_hybrid_abl_i2.md
+
+=== ABLATION SUMMARY ===
+  model                               R@1    R@5    R@10
+  T2 hybrid (baseline)                0.090  0.240  0.349
+    ablation I1 (disabled)            0.065  0.189  0.272
+    ablation I3 (disabled)            0.080  0.227  0.337
+    ablation I2 (disabled)            0.083  0.239  0.349
