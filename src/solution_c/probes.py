@@ -38,7 +38,7 @@ def train_probes(F_feat, L, device, iters=1500, lr=1e-2, val_frac=0.1, log=print
     """
     N = F_feat.shape[0]
     g = torch.Generator().manual_seed(0)
-    perm = torch.randperm(N, generator=g).to(device)
+    perm = torch.randperm(N, generator=g).to(F_feat.device)   # index on the data's device
     n_val = max(1, int(N * val_frac))
     tr, va = perm[:-n_val], perm[-n_val:]
     Xtr, Ytr = F_feat[tr].to(device), L[tr].float().to(device)
