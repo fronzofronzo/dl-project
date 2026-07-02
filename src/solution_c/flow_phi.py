@@ -61,7 +61,8 @@ def slerp_velocity(v0, v1, t):
 
     dx_t/dt is tangent to the sphere at x_t with constant norm θ (check: at t=0
     the dot with v0 is θ(−cosθ + cosθ)/sinθ = 0). Near-coincident endpoints
-    (θ < 1e-4) collapse to x_t = v0, velocity 0.
+    (θ < 1e-3; the cos clamp alone already forces θ ≳ 4.5e-4) collapse to
+    x_t = v0, velocity 0.
 
     v0, v1: [B, d] unit vectors.  t: [B, 1] in [0, 1].  -> (x_t [B,d], u [B,d])
     """
@@ -70,7 +71,7 @@ def slerp_velocity(v0, v1, t):
     sin = torch.sin(theta).clamp_min(1e-7)
     x_t = (torch.sin((1 - t) * theta) * v0 + torch.sin(t * theta) * v1) / sin
     u = theta * (-torch.cos((1 - t) * theta) * v0 + torch.cos(t * theta) * v1) / sin
-    small = theta < 1e-4
+    small = theta < 1e-3
     x_t = torch.where(small, v0, F.normalize(x_t, dim=-1))
     u = torch.where(small, torch.zeros_like(u), u)
     return x_t, u
