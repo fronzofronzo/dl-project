@@ -115,7 +115,7 @@ class FlowPhi(nn.Module):
 
     def __init__(self, n_attr=N_ATTR, dim=DIM, w_emb=64, w_hidden=256, rank=16,
                  d_model=256, n_heads=4, t_freqs=8, hybrid=True,
-                 free_residual=True, n_steps=8, guidance=0.0):
+                 free_residual=True, n_steps=8, guidance=0.0, horizon=1.0):
         """
         n_attr, dim     CelebA attributes / CLIP feature dim
         w_emb, w_hidden, rank   T2 direction-branch sizes (MUST match the T2
@@ -127,6 +127,10 @@ class FlowPhi(nn.Module):
         free_residual   zero-init free velocity term outside the dictionary span
         n_steps         default Euler steps at inference (mutable attribute)
         guidance        default probe-guidance λ at inference (mutable attribute)
+        horizon         default integration horizon T ∈ (0, 1]: integrate to time
+                        T instead of 1 — a continuous edit-strength dial (T=1
+                        reaches the CFM endpoint, smaller T stays closer to
+                        v_ref; mutable attribute, swept at inference)
         """
         super().__init__()
         self.dim = dim
@@ -134,6 +138,7 @@ class FlowPhi(nn.Module):
         self.free_residual = free_residual
         self.n_steps = n_steps
         self.guidance = guidance
+        self.horizon = horizon
         self.t_freqs = t_freqs
 
         # ---- (a)+(b) T2-compatible branch: names MUST mirror T2Phi ---------- #
@@ -267,29 +272,32 @@ class FlowPhi(nn.Module):
     # contract
     # ------------------------------------------------------------------ #
     def forward(self, v_ref, cond_col, cond_sign, cond_mask,
-                n_steps=None, guidance=None):
-        """Integrate the flow from v_ref for n_steps Euler steps -> v_q.
+                n_steps=None, guidance=None, horizon=None):
+        """Integrate the flow from v_ref for n_steps Euler steps up to time T -> v_q.
 
           v_ref     [B, 512]  reference image features (L2-norm, frozen CLIP)
           cond_col  [B, C]    long, attribute column per condition (0 = pad)
           cond_sign [B, C]    float, +1 additive / −1 subtractive / 0 pad
           cond_mask [B, C]    bool, True for real conditions
-          n_steps / guidance  optional overrides of the instance defaults
+          n_steps / guidance / horizon  optional overrides of the instance defaults
           -> v_q    [B, 512]  composed query, L2-normalized
 
-        Each step: v ← Exp_v( (1/N)·[u_θ(v, k/N) + λ·Π_tangent ∇ log p] ).
-        Differentiable end to end (used for the endpoint contrastive loss).
+        Each step: v ← Exp_v( (T/N)·[u_θ(v, kT/N) + λ·Π_tangent ∇ log p] ).
+        T < 1 stops the trajectory early — a partial edit that stays closer to
+        v_ref (edit-strength dial; the CFM path parametrization makes time the
+        natural magnitude axis). Differentiable end to end (endpoint loss).
         """
         N = int(n_steps if n_steps is not None else self.n_steps)
         lam = float(guidance if guidance is not None else self.guidance)
+        T = float(horizon if horizon is not None else self.horizon)
         v = F.normalize(v_ref.float(), dim=1)
         for k in range(N):
-            t = torch.full((v.shape[0],), k / N, device=v.device, dtype=v.dtype)
+            t = torch.full((v.shape[0],), k * T / N, device=v.device, dtype=v.dtype)
             u = self.velocity(v, t, cond_col, cond_sign, cond_mask)
             if lam != 0.0 and self.has_probes():
                 g = self.guidance_grad(v, cond_col, cond_sign, cond_mask)
                 u = u + lam * tangent_project(g, v)
-            v = exp_step(v, u / N)
+            v = exp_step(v, u * (T / N))
         return F.normalize(v, dim=1)
 
 
@@ -383,6 +391,12 @@ def _smoke():
     assert torch.allclose(v_q.norm(dim=1), torch.ones(B), atol=1e-5)
     v_g = phi(v_ref, cond_col, cond_sign, cond_mask, n_steps=4, guidance=1.0)
     assert not torch.allclose(v_q, v_g, atol=1e-5), "guidance had no effect"
+    v_h0 = phi(v_ref, cond_col, cond_sign, cond_mask, n_steps=4, horizon=1e-9)
+    assert torch.allclose(v_h0, F.normalize(v_ref, dim=1), atol=1e-4), "horizon->0 != v_ref"
+    v_h5 = phi(v_ref, cond_col, cond_sign, cond_mask, n_steps=4, horizon=0.5)
+    ang_half = (v_h5 * F.normalize(v_ref, dim=1)).sum(1)
+    ang_full = (v_q * F.normalize(v_ref, dim=1)).sum(1)
+    assert (ang_half >= ang_full - 1e-5).all(), "shorter horizon should stay closer to v_ref"
     loss = (1 - (v_q * F.normalize(v_ref, dim=1)).sum(1)).mean()
     loss.backward()
     for name, p in phi.named_parameters():

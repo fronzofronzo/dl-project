@@ -27,8 +27,9 @@ from src.solution_c.flow_phi import FlowPhi
 from src.solution_c.probes import PROBES_PT, load_probes
 
 KS = (1, 5, 10)
-SWEEP_STEPS = (1, 2, 4, 8, 16)
-SWEEP_GUIDANCE = (0.0, 0.25, 0.5, 1.0)
+SWEEP_STEPS = (1, 4, 8)
+SWEEP_GUIDANCE = (0.0, 0.25, 0.5)
+SWEEP_HORIZON = (0.5, 0.75, 1.0)
 
 
 def load_flow(ckpt_path, device):
@@ -77,31 +78,38 @@ def write_results(rows, name, extra_header=""):
     print(f"frozen -> {RESULTS / f'solution_c_{name}.md'}")
 
 
-def sweep(phi, db, gts, attr_index, device, name,
-          steps_grid=SWEEP_STEPS, guid_grid=SWEEP_GUIDANCE):
-    """Inference-only grid over (N, λ). Returns the best (N, λ, rows) by R@1/R@5."""
+def sweep(phi, db, gts, attr_index, device, name, steps_grid=SWEEP_STEPS,
+          guid_grid=SWEEP_GUIDANCE, horizon_grid=SWEEP_HORIZON):
+    """Inference-only grid over (N, λ, horizon T). Returns best (cfg, rows) by R@1/R@5.
+
+    T is the integration horizon: stop the trajectory at time T < 1 -> partial
+    edit, closer to v_ref (edit-strength dial, free at inference).
+    """
     if not phi.has_probes():
         guid_grid = [g for g in guid_grid if g == 0.0] or [0.0]
         print("no probes on this checkpoint -> guidance sweep restricted to λ=0")
 
     lines = [f"# Solution C — Φ-Flow inference sweep ({name})", "",
-             "| N steps | λ guidance | R@1 | R@5 | R@10 |", "|---|---|---|---|---|"]
+             "| N steps | λ guidance | T horizon | R@1 | R@5 | R@10 |",
+             "|---|---|---|---|---|---|"]
     best = (-1.0, -1.0)
     best_cfg, best_rows = None, None
     for n in steps_grid:
         for lam in guid_grid:
-            phi.n_steps, phi.guidance = int(n), float(lam)
-            rows = eval_phi(phi, db, gts, attr_index, device)
-            m = rows["MACRO"]
-            print(f"N={n:>2} λ={lam:<5} | R@1 {m['recall@1']:.3f} "
-                  f"R@5 {m['recall@5']:.3f} R@10 {m['recall@10']:.3f}")
-            lines.append(f"| {n} | {lam} | {m['recall@1']:.3f} | {m['recall@5']:.3f} "
-                         f"| {m['recall@10']:.3f} |")
-            key = (m["recall@1"], m["recall@5"])
-            if key > best:
-                best, best_cfg, best_rows = key, (int(n), float(lam)), rows
+            for T in horizon_grid:
+                phi.n_steps, phi.guidance, phi.horizon = int(n), float(lam), float(T)
+                rows = eval_phi(phi, db, gts, attr_index, device)
+                m = rows["MACRO"]
+                print(f"N={n:>2} λ={lam:<5} T={T:<5} | R@1 {m['recall@1']:.3f} "
+                      f"R@5 {m['recall@5']:.3f} R@10 {m['recall@10']:.3f}")
+                lines.append(f"| {n} | {lam} | {T} | {m['recall@1']:.3f} "
+                             f"| {m['recall@5']:.3f} | {m['recall@10']:.3f} |")
+                key = (m["recall@1"], m["recall@5"])
+                if key > best:
+                    best, best_cfg = key, (int(n), float(lam), float(T))
+                    best_rows = rows
 
-    lines += ["", f"best: N={best_cfg[0]}, λ={best_cfg[1]} "
+    lines += ["", f"best: N={best_cfg[0]}, λ={best_cfg[1]}, T={best_cfg[2]} "
                   f"(R@1 {best[0]:.3f}, R@5 {best[1]:.3f})"]
     (RESULTS / f"solution_c_{name}_sweep.md").write_text("\n".join(lines) + "\n")
     print(f"sweep frozen -> {RESULTS / f'solution_c_{name}_sweep.md'}")
@@ -115,6 +123,7 @@ def main():
     ap.add_argument("--name", default=None, help="results-file tag (default: ckpt stem)")
     ap.add_argument("--steps", type=int, default=8, help="Euler steps N")
     ap.add_argument("--guidance", type=float, default=0.0, help="probe-guidance λ")
+    ap.add_argument("--horizon", type=float, default=1.0, help="integration horizon T")
     ap.add_argument("--probes", default=str(PROBES_PT),
                     help="probes file for guidance (skipped if missing)")
     ap.add_argument("--sweep", action="store_true",
@@ -137,15 +146,16 @@ def main():
     attr_index = attr_index_test()
 
     if args.sweep:
-        (n, lam), rows = sweep(phi, db, gts, attr_index, device, name)
-        write_results(rows, name, extra_header=f"best sweep cell: N={n}, λ={lam}")
+        (n, lam, T), rows = sweep(phi, db, gts, attr_index, device, name)
+        write_results(rows, name, extra_header=f"best sweep cell: N={n}, λ={lam}, T={T}")
     else:
-        phi.n_steps, phi.guidance = args.steps, args.guidance
+        phi.n_steps, phi.guidance, phi.horizon = args.steps, args.guidance, args.horizon
         rows = eval_phi(phi, db, gts, attr_index, device)
         m = rows["MACRO"]
-        print(f"{name}: N={args.steps} λ={args.guidance} | R@1={m['recall@1']:.3f} "
-              f"R@5={m['recall@5']:.3f} R@10={m['recall@10']:.3f}")
-        write_results(rows, name, extra_header=f"N={args.steps}, λ={args.guidance}")
+        print(f"{name}: N={args.steps} λ={args.guidance} T={args.horizon} | "
+              f"R@1={m['recall@1']:.3f} R@5={m['recall@5']:.3f} R@10={m['recall@10']:.3f}")
+        write_results(rows, name,
+                      extra_header=f"N={args.steps}, λ={args.guidance}, T={args.horizon}")
 
 
 if __name__ == "__main__":

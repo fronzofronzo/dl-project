@@ -68,19 +68,37 @@ def cfm_loss(phi, batch):
     return (u - u_target).pow(2).sum(dim=1).mean()
 
 
-def train(phi, data, gts, db, attr_index, device, log_file, args):
-    """Optimize Φ-Flow; return (best_state, best_rows). CLIP/DB untouched."""
+def param_groups(phi, lr, lr_new):
+    """Two LR groups: warm-started T2 branch vs the zero-init correction heads.
+
+    The corrections start at zero and have to grow against an already-good field;
+    a higher lr_new lets them move without destabilizing the loaded branch.
+    """
+    new_prefixes = ("attr_emb_attn", "sign_emb", "inj", "encoder", "w_corr", "free_proj")
+    new, old = [], []
+    for name, p in phi.named_parameters():
+        (new if name.startswith(new_prefixes) else old).append(p)
+    return [{"params": old, "lr": lr}, {"params": new, "lr": lr_new}]
+
+
+def train(phi, data, gts, db, attr_index, device, log_file, args, save_ckpt):
+    """Optimize Φ-Flow; return (best_state, best_rows). CLIP/DB untouched.
+
+    `save_ckpt(state)` is called at every eval improvement, so an interrupted
+    run keeps its best checkpoint on disk.
+    """
     phi.to(device)
-    opt = optim.Adam(phi.parameters(), lr=args.lr)
+    opt = optim.Adam(param_groups(phi, args.lr, args.lr_new or args.lr))
     best_key, best_rows, best_state = (-1.0, -1.0), None, None
 
     for step in range(1, args.steps + 1):
         phi.train()
         b = data.sample_batch(args.batch)
 
-        l_cfm = cfm_loss(phi, b)
-        loss = l_cfm
-        l_nce = l_id = torch.zeros((), device=device)
+        l_cfm = l_nce = l_id = torch.zeros((), device=device)
+        if args.lam_cfm > 0:
+            l_cfm = cfm_loss(phi, b)
+        loss = args.lam_cfm * l_cfm
         if args.lam_nce > 0:
             v_q = phi(b["v_ref"], b["cond_col"], b["cond_sign"], b["cond_mask"],
                       n_steps=args.k_endpoint, guidance=0.0)
@@ -107,6 +125,7 @@ def train(phi, data, gts, db, attr_index, device, log_file, args):
                 best_key, best_rows = key, rows
                 best_state = {k: v.detach().cpu().clone()
                               for k, v in phi.state_dict().items()}
+                save_ckpt(best_state)                # interruption-safe
 
     return best_state, best_rows
 
@@ -118,7 +137,11 @@ def main():
     ap.add_argument("--steps", type=int, default=12000)
     ap.add_argument("--batch", type=int, default=256)
     ap.add_argument("--lr", type=float, default=3e-4)
+    ap.add_argument("--lr-new", type=float, default=None,
+                    help="LR for the zero-init correction heads (default: --lr)")
     ap.add_argument("--tau", type=float, default=0.05)
+    ap.add_argument("--lam-cfm", type=float, default=1.0,
+                    help="flow-matching regression weight (0 = contrastive-only)")
     ap.add_argument("--lam-nce", type=float, default=0.5,
                     help="endpoint InfoNCE weight (0 = pure CFM)")
     ap.add_argument("--lam-id", type=float, default=0.1,
@@ -134,6 +157,8 @@ def main():
     ap.add_argument("--no-free-residual", action="store_true")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
+    if args.lam_cfm <= 0 and args.lam_nce <= 0:
+        ap.error("at least one of --lam-cfm / --lam-nce must be > 0")
 
     torch.manual_seed(args.seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -165,15 +190,16 @@ def main():
         else:
             _log("  training from scratch (no warm start)", log_file)
 
-        best_state, best_rows = train(phi, data, gts, db, attr_index, device,
-                                      log_file, args)
+        def save_ckpt(state):
+            ckpt = {"config": config, "state": state, "args": vars(args)}
+            for path in (RESULTS / f"phi_flow_{args.name}_{ts}.pt",
+                         RESULTS / f"phi_flow_{args.name}.pt"):
+                torch.save(ckpt, path)
 
-        ckpt = {"config": config, "state": best_state, "args": vars(args)}
-        for path in (RESULTS / f"phi_flow_{args.name}_{ts}.pt",
-                     RESULTS / f"phi_flow_{args.name}.pt"):
-            torch.save(ckpt, path)
+        best_state, best_rows = train(phi, data, gts, db, attr_index, device,
+                                      log_file, args, save_ckpt)
         _log(f"best checkpoint -> {RESULTS / f'phi_flow_{args.name}.pt'} "
-             f"(+ timestamped copy)", log_file)
+             f"(+ timestamped copy; saved at every improvement)", log_file)
 
         m = best_rows["MACRO"]
         _log(f"best (N={args.eval_steps}, λ=0): R@1 {m['recall@1']:.3f} "
