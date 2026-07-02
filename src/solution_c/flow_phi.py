@@ -282,10 +282,13 @@ class FlowPhi(nn.Module):
           n_steps / guidance / horizon  optional overrides of the instance defaults
           -> v_q    [B, 512]  composed query, L2-normalized
 
-        Each step: v ← Exp_v( (T/N)·[u_θ(v, kT/N) + λ·Π_tangent ∇ log p] ).
-        T < 1 stops the trajectory early — a partial edit that stays closer to
-        v_ref (edit-strength dial; the CFM path parametrization makes time the
-        natural magnitude axis). Differentiable end to end (endpoint loss).
+        Each step: v ← Exp_v( (T/N)·[u_θ + λ·‖u_θ‖·ĝ] ), ĝ = unit tangent probe
+        gradient. λ is a RELATIVE mix (fraction of the field's own magnitude):
+        the raw probe gradient has arbitrary norm (unnormalized logistic W) and
+        measured orders of magnitude above ‖u_θ‖ ≈ θ ≤ π — unscaled it destroys
+        the trajectory. T < 1 stops the trajectory early — a partial edit that
+        stays closer to v_ref (edit-strength dial; the CFM path parametrization
+        makes time the natural magnitude axis). Differentiable end to end.
         """
         N = int(n_steps if n_steps is not None else self.n_steps)
         lam = float(guidance if guidance is not None else self.guidance)
@@ -295,8 +298,9 @@ class FlowPhi(nn.Module):
             t = torch.full((v.shape[0],), k * T / N, device=v.device, dtype=v.dtype)
             u = self.velocity(v, t, cond_col, cond_sign, cond_mask)
             if lam != 0.0 and self.has_probes():
-                g = self.guidance_grad(v, cond_col, cond_sign, cond_mask)
-                u = u + lam * tangent_project(g, v)
+                g = tangent_project(self.guidance_grad(v, cond_col, cond_sign, cond_mask), v)
+                g_hat = g / g.norm(dim=-1, keepdim=True).clamp_min(1e-8)
+                u = u + lam * u.norm(dim=-1, keepdim=True) * g_hat
             v = exp_step(v, u * (T / N))
         return F.normalize(v, dim=1)
 
