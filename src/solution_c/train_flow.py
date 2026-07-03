@@ -84,12 +84,19 @@ def param_groups(phi, lr, lr_new):
 def train(phi, data, gts, db, attr_index, device, log_file, args, save_ckpt):
     """Optimize Φ-Flow; return (best_state, best_rows). CLIP/DB untouched.
 
-    `save_ckpt(state)` is called at every eval improvement, so an interrupted
-    run keeps its best checkpoint on disk.
+    `save_ckpt(state, tag)` is called at every eval improvement, so an
+    interrupted run keeps its best checkpoints on disk.
+
+    Selection: the MAIN checkpoint maximizes the weighted mean
+    w_r1·R@1 + (1−w_r1)·R@5 — less sensitive to single-eval noise than the old
+    lexicographic (R@1, R@5) key, which once froze a lucky step-200 eval and
+    threw away a late model that was +0.026 R@5 / +0.053 R@10 for −0.003 R@1.
+    The best-R@1 model is also kept, as a separate `_r1` checkpoint.
     """
     phi.to(device)
     opt = optim.Adam(param_groups(phi, args.lr, args.lr_new or args.lr))
-    best_key, best_rows, best_state = (-1.0, -1.0), None, None
+    best_score, best_rows, best_state = -1.0, None, None
+    best_r1 = (-1.0, -1.0)
 
     for step in range(1, args.steps + 1):
         phi.train()
@@ -120,12 +127,17 @@ def train(phi, data, gts, db, attr_index, device, log_file, args, save_ckpt):
                  f"nce {l_nce.item():.3f} id {l_id.item():.3f}) | "
                  f"R@1 {m['recall@1']:.3f} R@5 {m['recall@5']:.3f} "
                  f"R@10 {m['recall@10']:.3f}", log_file)
-            key = (m["recall@1"], m["recall@5"])
-            if key > best_key:
-                best_key, best_rows = key, rows
+            score = args.w_r1 * m["recall@1"] + (1 - args.w_r1) * m["recall@5"]
+            if score > best_score:
+                best_score, best_rows = score, rows
                 best_state = {k: v.detach().cpu().clone()
                               for k, v in phi.state_dict().items()}
                 save_ckpt(best_state)                # interruption-safe
+            key = (m["recall@1"], m["recall@5"])
+            if key > best_r1:
+                best_r1 = key
+                save_ckpt({k: v.detach().cpu().clone()
+                           for k, v in phi.state_dict().items()}, tag="r1")
 
     return best_state, best_rows
 
@@ -151,6 +163,9 @@ def main():
     ap.add_argument("--eval-every", type=int, default=200)
     ap.add_argument("--eval-steps", type=int, default=8,
                     help="Euler steps N for periodic validation")
+    ap.add_argument("--w-r1", type=float, default=0.5,
+                    help="R@1 weight in the ckpt-selection score "
+                         "w·R@1 + (1−w)·R@5")
     ap.add_argument("--warm-start", default=str(T2_CKPT),
                     help="T2 checkpoint for the direction/weight branch")
     ap.add_argument("--no-warm-start", action="store_true")
@@ -190,16 +205,19 @@ def main():
         else:
             _log("  training from scratch (no warm start)", log_file)
 
-        def save_ckpt(state):
+        def save_ckpt(state, tag=None):
             ckpt = {"config": config, "state": state, "args": vars(args)}
-            for path in (RESULTS / f"phi_flow_{args.name}_{ts}.pt",
-                         RESULTS / f"phi_flow_{args.name}.pt"):
+            suffix = f"_{tag}" if tag else ""
+            paths = [RESULTS / f"phi_flow_{args.name}{suffix}.pt"]
+            if not tag:                              # timestamped copy: main only
+                paths.append(RESULTS / f"phi_flow_{args.name}_{ts}.pt")
+            for path in paths:
                 torch.save(ckpt, path)
 
         best_state, best_rows = train(phi, data, gts, db, attr_index, device,
                                       log_file, args, save_ckpt)
-        _log(f"best checkpoint -> {RESULTS / f'phi_flow_{args.name}.pt'} "
-             f"(+ timestamped copy; saved at every improvement)", log_file)
+        _log(f"best checkpoints -> {RESULTS / f'phi_flow_{args.name}.pt'} "
+             f"(macro-sum) + _r1.pt (best R@1); saved at every improvement", log_file)
 
         m = best_rows["MACRO"]
         _log(f"best (N={args.eval_steps}, λ=0): R@1 {m['recall@1']:.3f} "
