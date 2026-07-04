@@ -1,0 +1,2 @@
+BO report -> /home/disi/dl-project/results/solution_c_bo_dials.md
+best: {'n_steps': 8, 'horizon': 1.0, 'guidance': 0.0, 'eta': 0.0001, 'weighting': 'none'} score=0.1352

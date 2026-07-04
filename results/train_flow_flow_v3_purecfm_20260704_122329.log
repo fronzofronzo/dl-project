@@ -1,0 +1,65 @@
+device: cuda  phi: flow/flow_v3_purecfm
+name=flow_v3_purecfm  steps=12000  batch=256  lr=0.0003  lr_new=0.001  tau=0.05  lam_cfm=1.0  lam_nce=0.0  lam_id=0.1  k_endpoint=8  eval_every=200  eval_steps=8  w_r1=0.5  warm_start=/home/disi/dl-project/results/phi_t2_hybrid.pt  no_warm_start=False  no_free_residual=False  seed=0
+  warm-started 15 tensors from phi_t2_hybrid.pt (init velocity field == T2-hybrid edit field)
+step   200 | loss 0.703 (cfm 0.703 nce 0.000 id 0.000) | R@1 0.024 R@5 0.075 R@10 0.117
+step   400 | loss 0.664 (cfm 0.664 nce 0.000 id 0.000) | R@1 0.024 R@5 0.076 R@10 0.122
+step   600 | loss 0.672 (cfm 0.672 nce 0.000 id 0.000) | R@1 0.024 R@5 0.076 R@10 0.127
+step   800 | loss 0.659 (cfm 0.659 nce 0.000 id 0.000) | R@1 0.023 R@5 0.084 R@10 0.129
+step  1000 | loss 0.663 (cfm 0.663 nce 0.000 id 0.000) | R@1 0.024 R@5 0.082 R@10 0.131
+step  1200 | loss 0.655 (cfm 0.655 nce 0.000 id 0.000) | R@1 0.024 R@5 0.080 R@10 0.131
+step  1400 | loss 0.651 (cfm 0.651 nce 0.000 id 0.000) | R@1 0.024 R@5 0.087 R@10 0.134
+step  1600 | loss 0.653 (cfm 0.653 nce 0.000 id 0.000) | R@1 0.028 R@5 0.088 R@10 0.133
+step  1800 | loss 0.663 (cfm 0.663 nce 0.000 id 0.000) | R@1 0.024 R@5 0.084 R@10 0.133
+step  2000 | loss 0.637 (cfm 0.637 nce 0.000 id 0.000) | R@1 0.025 R@5 0.085 R@10 0.133
+step  2200 | loss 0.640 (cfm 0.640 nce 0.000 id 0.000) | R@1 0.025 R@5 0.084 R@10 0.135
+step  2400 | loss 0.660 (cfm 0.660 nce 0.000 id 0.000) | R@1 0.024 R@5 0.086 R@10 0.133
+step  2600 | loss 0.640 (cfm 0.640 nce 0.000 id 0.000) | R@1 0.024 R@5 0.078 R@10 0.123
+step  2800 | loss 0.650 (cfm 0.650 nce 0.000 id 0.000) | R@1 0.024 R@5 0.084 R@10 0.128
+step  3000 | loss 0.629 (cfm 0.629 nce 0.000 id 0.000) | R@1 0.023 R@5 0.083 R@10 0.124
+step  3200 | loss 0.652 (cfm 0.652 nce 0.000 id 0.000) | R@1 0.024 R@5 0.083 R@10 0.131
+step  3400 | loss 0.639 (cfm 0.639 nce 0.000 id 0.000) | R@1 0.026 R@5 0.083 R@10 0.138
+step  3600 | loss 0.637 (cfm 0.637 nce 0.000 id 0.000) | R@1 0.027 R@5 0.089 R@10 0.133
+step  3800 | loss 0.651 (cfm 0.651 nce 0.000 id 0.000) | R@1 0.029 R@5 0.090 R@10 0.141
+step  4000 | loss 0.648 (cfm 0.648 nce 0.000 id 0.000) | R@1 0.032 R@5 0.090 R@10 0.140
+step  4200 | loss 0.653 (cfm 0.653 nce 0.000 id 0.000) | R@1 0.026 R@5 0.084 R@10 0.130
+step  4400 | loss 0.635 (cfm 0.635 nce 0.000 id 0.000) | R@1 0.024 R@5 0.082 R@10 0.127
+step  4600 | loss 0.631 (cfm 0.631 nce 0.000 id 0.000) | R@1 0.028 R@5 0.087 R@10 0.135
+step  4800 | loss 0.629 (cfm 0.629 nce 0.000 id 0.000) | R@1 0.029 R@5 0.089 R@10 0.133
+step  5000 | loss 0.635 (cfm 0.635 nce 0.000 id 0.000) | R@1 0.024 R@5 0.080 R@10 0.123
+step  5200 | loss 0.629 (cfm 0.629 nce 0.000 id 0.000) | R@1 0.025 R@5 0.076 R@10 0.124
+step  5400 | loss 0.634 (cfm 0.634 nce 0.000 id 0.000) | R@1 0.029 R@5 0.086 R@10 0.138
+step  5600 | loss 0.630 (cfm 0.630 nce 0.000 id 0.000) | R@1 0.032 R@5 0.087 R@10 0.134
+step  5800 | loss 0.640 (cfm 0.640 nce 0.000 id 0.000) | R@1 0.035 R@5 0.095 R@10 0.148
+step  6000 | loss 0.639 (cfm 0.639 nce 0.000 id 0.000) | R@1 0.028 R@5 0.083 R@10 0.131
+step  6200 | loss 0.649 (cfm 0.649 nce 0.000 id 0.000) | R@1 0.024 R@5 0.078 R@10 0.127
+step  6400 | loss 0.624 (cfm 0.624 nce 0.000 id 0.000) | R@1 0.029 R@5 0.090 R@10 0.140
+step  6600 | loss 0.638 (cfm 0.638 nce 0.000 id 0.000) | R@1 0.024 R@5 0.078 R@10 0.120
+step  6800 | loss 0.650 (cfm 0.650 nce 0.000 id 0.000) | R@1 0.025 R@5 0.077 R@10 0.123
+step  7000 | loss 0.633 (cfm 0.633 nce 0.000 id 0.000) | R@1 0.025 R@5 0.087 R@10 0.132
+step  7200 | loss 0.635 (cfm 0.635 nce 0.000 id 0.000) | R@1 0.025 R@5 0.084 R@10 0.132
+step  7400 | loss 0.635 (cfm 0.635 nce 0.000 id 0.000) | R@1 0.024 R@5 0.081 R@10 0.124
+step  7600 | loss 0.610 (cfm 0.610 nce 0.000 id 0.000) | R@1 0.025 R@5 0.081 R@10 0.135
+step  7800 | loss 0.642 (cfm 0.642 nce 0.000 id 0.000) | R@1 0.025 R@5 0.084 R@10 0.130
+step  8000 | loss 0.619 (cfm 0.619 nce 0.000 id 0.000) | R@1 0.025 R@5 0.083 R@10 0.129
+step  8200 | loss 0.640 (cfm 0.640 nce 0.000 id 0.000) | R@1 0.029 R@5 0.084 R@10 0.126
+step  8400 | loss 0.632 (cfm 0.632 nce 0.000 id 0.000) | R@1 0.024 R@5 0.082 R@10 0.127
+step  8600 | loss 0.649 (cfm 0.649 nce 0.000 id 0.000) | R@1 0.023 R@5 0.088 R@10 0.130
+step  8800 | loss 0.623 (cfm 0.623 nce 0.000 id 0.000) | R@1 0.024 R@5 0.081 R@10 0.127
+step  9000 | loss 0.661 (cfm 0.661 nce 0.000 id 0.000) | R@1 0.024 R@5 0.079 R@10 0.130
+step  9200 | loss 0.621 (cfm 0.621 nce 0.000 id 0.000) | R@1 0.031 R@5 0.088 R@10 0.138
+step  9400 | loss 0.642 (cfm 0.642 nce 0.000 id 0.000) | R@1 0.028 R@5 0.084 R@10 0.126
+step  9600 | loss 0.638 (cfm 0.638 nce 0.000 id 0.000) | R@1 0.030 R@5 0.083 R@10 0.129
+step  9800 | loss 0.638 (cfm 0.638 nce 0.000 id 0.000) | R@1 0.031 R@5 0.083 R@10 0.132
+step 10000 | loss 0.623 (cfm 0.623 nce 0.000 id 0.000) | R@1 0.029 R@5 0.088 R@10 0.133
+step 10200 | loss 0.636 (cfm 0.636 nce 0.000 id 0.000) | R@1 0.026 R@5 0.080 R@10 0.122
+step 10400 | loss 0.651 (cfm 0.651 nce 0.000 id 0.000) | R@1 0.027 R@5 0.088 R@10 0.132
+step 10600 | loss 0.636 (cfm 0.636 nce 0.000 id 0.000) | R@1 0.023 R@5 0.079 R@10 0.124
+step 10800 | loss 0.649 (cfm 0.649 nce 0.000 id 0.000) | R@1 0.026 R@5 0.080 R@10 0.123
+step 11000 | loss 0.641 (cfm 0.641 nce 0.000 id 0.000) | R@1 0.031 R@5 0.085 R@10 0.132
+step 11200 | loss 0.631 (cfm 0.631 nce 0.000 id 0.000) | R@1 0.028 R@5 0.085 R@10 0.130
+step 11400 | loss 0.651 (cfm 0.651 nce 0.000 id 0.000) | R@1 0.028 R@5 0.084 R@10 0.127
+step 11600 | loss 0.650 (cfm 0.650 nce 0.000 id 0.000) | R@1 0.028 R@5 0.088 R@10 0.139
+step 11800 | loss 0.661 (cfm 0.661 nce 0.000 id 0.000) | R@1 0.026 R@5 0.088 R@10 0.134
+step 12000 | loss 0.629 (cfm 0.629 nce 0.000 id 0.000) | R@1 0.027 R@5 0.082 R@10 0.127
+best checkpoints -> /home/disi/dl-project/results/phi_flow_flow_v3_purecfm.pt (macro-sum) + _r1.pt (best R@1); saved at every improvement
+best (N=8, λ=0): R@1 0.035 R@5 0.095 R@10 0.148

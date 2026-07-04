@@ -1,0 +1,6 @@
+device: cuda  phi: flow/flow_v3_scratch
+name=flow_v3_scratch  steps=12000  batch=256  lr=0.0003  lr_new=0.001  tau=0.05  lam_cfm=1.0  lam_nce=1.0  lam_id=0.4  k_endpoint=8  eval_every=200  eval_steps=8  w_r1=0.5  warm_start=/home/disi/dl-project/results/phi_t2_hybrid.pt  no_warm_start=True  no_free_residual=False  seed=0
+  training from scratch (no warm start)
+step   200 | loss 6.652 (cfm 0.831 nce 5.685 id 0.339) | R@1 0.069 R@5 0.189 R@10 0.291
+step   400 | loss 6.302 (cfm 0.750 nce 5.373 id 0.447) | R@1 0.054 R@5 0.204 R@10 0.319
+step   600 | loss 6.298 (cfm 0.715 nce 5.414 id 0.422) | R@1 0.055 R@5 0.204 R@10 0.299
